@@ -1,0 +1,10 @@
+# Dependencies and build output
+**/node_modules/**
+**/dist/**
+**/.pnpm-store/**
+
+# Lockfiles
+pnpm-lock.yaml
+
+# Vendored docs (keep snapshots unchanged)
+docs/vendor/**

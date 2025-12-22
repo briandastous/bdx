@@ -50,6 +50,7 @@ export default tseslint.config(
       "**/node_modules/**",
       "**/.pnpm-store/**",
       "docs/typescript/best_practices/**",
+      "docs/vendor/**",
     ],
   },
 );
