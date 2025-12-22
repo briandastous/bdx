@@ -331,63 +331,58 @@ Track legacy issues we discover during parity work that should not be copied bli
 
 Track invariants from legacy Gel constraints / required fields / Python checks and decide how each is enforced in Postgres.
 
-For each invariant, record:
-- legacy source (Gel constraint, required field, Python enforcement point),
-- rewrite enforcement (constraint / schema shape / trigger / repository),
-- test strategy (unit/integration).
-
-- _None recorded yet._
+The authoritative register is maintained in `docs/parity/invariant-register.md` (Phase 1 seed).
 
 ## Work Plan
 
 ### Phase 1: Scope Freeze + Parity Inventory
 
-- [ ] Phase 1 exit criteria (Gate): do not begin Phase 2/3 schema migrations until these artifacts exist and have been reviewed.
-  - [ ] “Invariant Register” is seeded for core graph + ingest + assets (at minimum, everything we can extract from `dbschema/default.gel` plus key Python-enforced invariants like soft-delete/revive and membership snapshot/event consistency).
-  - [ ] “Legacy Bugs / Feature Gaps” is actively maintained: any suspected legacy bug/behavior gap discovered during parity work is recorded here and surfaced to the owner for an explicit decision (port as-is vs fix vs defer).
-  - [ ] A first-pass parity test matrix exists (linking “Must port” bullets to planned tests or explicit manual verification steps).
-- [ ] Establish baseline repo documentation (keep it minimal, but accurate).
-  - [ ] Add a root `README.md` with local/dev quickstart and pointers to the plan.
-  - [ ] Add `docs/runbooks/migrations.md` (how to author/run migrations; worker/CLI policy; safety notes).
-  - [ ] Add `docs/runbooks/deploy-railway.md` (service shape + env vars + ops via Railway SSH).
-  - [ ] Vendor Kysely docs and make them actionable for implementation.
-    - [ ] Add a vendored snapshot under `docs/vendor/kysely/<version>/` matching the pinned `kysely` version.
-    - [ ] Add `docs/runbooks/kysely.md` with:
-      - [ ] a bdx-specific section (conventions and required patterns),
-      - [ ] a comprehensive index of the vendored upstream docs.
-    - [ ] Add a Codex skill under `.codex/skills/kysely-workflows/` that points to `docs/runbooks/kysely.md` and the vendored docs.
-- [ ] Confirm the exact “Must port” feature set by mapping each bullet in `docs/archive/NODE_POSTGRES_REWRITE_RESEARCH.md` to concrete behaviors and data invariants.
-  - [ ] Enumerate all ingest job variants (followers, followings, posts) and their modes (incremental vs full refresh).
-  - [ ] Enumerate all asset slugs and their params shapes from the current Python implementation.
-    - [ ] For each asset slug, record:
-      - [ ] params fields + identity semantics (what affects params hash vs inputs hash),
-      - [ ] dependency specs (other assets),
-      - [ ] ingest dependencies (what upstream syncs are prerequisites),
-      - [ ] membership item type (user IDs vs post IDs).
-  - [ ] Document “defer” and “do not port” items explicitly, with a checklist that they are absent in the rewrite.
-  - [ ] If any additional “zombie” asset features are discovered during parity work, document them and get explicit sign-off before deprecating.
-- [ ] Inventory legacy invariants (beyond schema) and seed the “Invariant Register”.
-  - [ ] Extract invariants from `dbschema/default.gel` (required fields, exclusives, expression constraints, delete semantics).
-  - [ ] Identify any invariants enforced primarily in Python (validation, state transitions, soft-delete/revive semantics).
-- [ ] Define naming/ID conventions for the rewrite (IDs, hashes, timestamps, “deleted at” columns).
-  - [ ] Apply the repo’s decided primary key strategy and document it in the schema/migrations.
-    - [ ] Use `bigint generated always as identity` surrogate primary keys for internal tables.
-    - [ ] Use X/Twitter IDs as Postgres `bigint` + TypeScript `bigint` for `users` and `posts` (and normalize at boundaries).
-    - [ ] Use upstream X/Twitter IDs as the primary keys for `users` and `posts` (`users.id`, `posts.id`).
-    - [ ] Use typed membership/event tables per asset family/item type (avoid polymorphic FKs).
-  - [ ] Implement the decided hash strategy (`sha256` + `hash_version` + canonicalization rules).
-  - [ ] Implement configuration overlays (non-secret) + env-based secrets.
-    - [ ] Add `config/base.yaml` and `config/env/<DEPLOY_ENV>.yaml` (non-secret only).
-    - [ ] Define and document precedence (env overlay overrides base; env vars override YAML).
-    - [ ] Update `packages/config` to load YAML + env and validate the resolved config with Zod.
-    - [ ] Ensure local dev workflow is explicit: `.env.local` for secrets (gitignored) + YAML for non-secrets.
-- [ ] Create a parity test matrix linking acceptance criteria to planned tests (unit/integration/e2e).
+- [x] Phase 1 exit criteria (Gate): do not begin Phase 2/3 schema migrations until these artifacts exist and have been reviewed.
+  - [x] “Invariant Register” is seeded for core graph + ingest + assets (see `docs/parity/invariant-register.md`).
+  - [x] “Legacy Bugs / Feature Gaps” is maintained in this plan (see `plans/NODE_POSTGRES_REWRITE_PLAN.md`).
+  - [x] A first-pass parity test matrix exists (see `docs/parity/test-matrix.md`).
+  - [x] A first-pass legacy test inventory exists (retain vs abandon) (see `docs/parity/legacy-tests.md`).
+- [x] Establish baseline repo documentation (keep it minimal, but accurate).
+  - [x] Add a root `README.md` with local/dev quickstart and pointers to the plan.
+  - [x] Add `docs/runbooks/migrations.md` (how to author/run migrations; worker/CLI policy; safety notes).
+  - [x] Add `docs/runbooks/deploy-railway.md` (service shape + env vars + ops via Railway SSH).
+  - [x] Vendor Kysely docs and make them actionable for implementation.
+    - [x] Add a vendored snapshot under `docs/vendor/kysely/<version>/` matching the pinned `kysely` version.
+    - [x] Add `docs/runbooks/kysely.md` with:
+      - [x] a bdx-specific section (conventions and required patterns),
+      - [x] a comprehensive index of the vendored upstream docs.
+    - [x] Add a Codex skill under `.codex/skills/kysely-workflows/` that points to `docs/runbooks/kysely.md` and the vendored docs.
+- [x] Confirm the exact “Must port” feature set by mapping each bullet in `docs/archive/NODE_POSTGRES_REWRITE_RESEARCH.md` to concrete behaviors and data invariants (see `docs/parity/inventory.md`).
+  - [x] Enumerate all ingest job variants (followers, followings, posts) and their modes (incremental vs full refresh).
+  - [x] Enumerate all asset slugs and their params shapes from the current Python implementation.
+    - [x] For each asset slug, record:
+      - [x] params fields + identity semantics (what affects params hash vs inputs hash),
+      - [x] dependency specs (other assets),
+      - [x] ingest dependencies (what upstream syncs are prerequisites),
+      - [x] membership item type (user IDs vs post IDs).
+  - [x] Document “defer” and “do not port” items explicitly, with a checklist that they are absent in the rewrite.
+  - [x] Confirm no additional “zombie” asset features exist (see `docs/parity/inventory.md`).
+- [x] Inventory legacy invariants (beyond schema) and seed the “Invariant Register” (see `docs/parity/invariant-register.md`).
+  - [x] Extract invariants from `dbschema/default.gel` (required fields, exclusives, expression constraints, delete semantics).
+  - [x] Identify any invariants enforced primarily in Python (validation, state transitions, soft-delete/revive semantics).
+- [x] Define naming/ID conventions for the rewrite (IDs, hashes, timestamps, “deleted at” columns).
+  - [x] Decide and document primary key strategy (see “IDs + Keys (Decision)”).
+  - [x] Implement the decided hash strategy (`sha256` + `hash_version` + canonicalization rules).
+  - [x] Implement configuration overlays (non-secret) + env-based secrets.
+    - [x] Add `config/base.yaml` and `config/env/<DEPLOY_ENV>.yaml` (non-secret only).
+    - [x] Define and document precedence (env overlay overrides base; env vars override YAML).
+    - [x] Update `packages/config` to load YAML + env and validate the resolved config with Zod.
+    - [x] Ensure local dev workflow is explicit: `.env.local` for secrets (gitignored) + YAML for non-secrets.
+- [x] Create a parity test matrix linking acceptance criteria to planned tests (unit/integration/e2e) (see `docs/parity/test-matrix.md`).
 
 ### Phase 2: Postgres Schema Design (Core Graph + Ingest)
 
 - [ ] Establish the rewrite’s migration baseline (Option B).
   - [ ] Rewrite `packages/db/src/migrations/0001_init.ts` to create the foundation schema for the rewrite (extensions/enums/base tables as needed).
   - [ ] After `0001_init.ts` is rewritten for the rewrite, treat subsequent migrations as append-only and immutable.
+- [ ] Apply the repo’s primary key strategy in all Phase 2 migrations (see “IDs + Keys (Decision)”).
+  - [ ] Use `bigint generated always as identity` surrogate primary keys for internal tables.
+  - [ ] Use upstream X/Twitter IDs as the primary keys for `users` and `posts` (`users.id`, `posts.id`).
 - [ ] Map legacy Gel constraints to Postgres constraints for core graph + ingest tables (using `dbschema/default.gel` as the source).
   - [ ] For each invariant, choose enforcement per “Constraints (Policy)” and record it in the “Invariant Register”.
 - [ ] Design and implement migrations for core graph entities.
@@ -645,6 +640,9 @@ For each invariant, record:
 
 ### Phase 13: Testing + Validation (Parity Focus)
 
+- [ ] Use Phase 1 parity artifacts as the source of truth for what to test.
+  - [ ] Parity checklist: `docs/parity/test-matrix.md` (map each “Must port” behavior to tests or explicit manual verification).
+  - [ ] Legacy coverage inventory: `docs/parity/legacy-tests.md` (for each “retain” legacy test, ensure equivalent coverage exists in the rewrite, even if the test shape differs).
 - [ ] Build a layered test strategy.
   - [ ] unit tests for hashing, params identity, and core planner decisions.
   - [ ] repository tests using a real Postgres instance via testcontainers.
@@ -656,6 +654,7 @@ For each invariant, record:
   - [ ] webhook API tests (auth, validation, DB writes).
 - [ ] Create a parity checklist and keep it green.
   - [ ] for each “Must port” bullet, add at least one test (or an explicit manual verification step with instructions).
+  - [ ] for each “retain” legacy test, record where its coverage lives in the rewrite (new test path(s) + a short note on any intentional changes).
 
 ### Phase 14: Local Dev + Deployment (Railway Staging/Prod)
 

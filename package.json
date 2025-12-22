@@ -8,7 +8,8 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "dev": "pnpm -r --parallel --if-present dev",
+    "dev": "pnpm -r --parallel --filter @bdx/api --filter @bdx/worker dev",
+    "db:migrate": "pnpm --filter @bdx/cli build && node packages/cli/dist/bin.js db:migrate",
     "lint": "eslint .",
     "format": "prettier -w .",
     "typecheck": "tsc -b --pretty false",

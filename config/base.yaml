@@ -1,0 +1,15 @@
+# Non-secret configuration defaults.
+#
+# - Secrets belong in environment variables (see `.env.example`).
+# - Per-environment overrides live in `config/env/<DEPLOY_ENV>.yaml`.
+
+logLevel: info
+
+api:
+  host: 0.0.0.0
+  port: 3000
+
+worker:
+  engineTickIntervalMs: 60000
+  runMigrations: true
+
