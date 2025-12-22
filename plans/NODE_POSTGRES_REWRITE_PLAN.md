@@ -56,6 +56,10 @@ The parity source of truth is the legacy codebase (`bdastous_monorepo`).
 - The repo targets Node **24 LTS** and TypeScript **strict** (including `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `useUnknownInCatchVariables`).
 - The repo builds, lints, typechecks, and tests in CI with reproducible installs via `pnpm-lock.yaml`.
 - TypeScript implementation and review follows `docs/typescript/best_practices` (deviations require explicit justification).
+- Prefer `unknown` at boundaries and runtime-validate/normalize before use:
+  - environment variables (`process.env`), webhook payloads, request params/bodies, and JSON columns are treated as untrusted inputs,
+  - use Zod (or equivalent) to parse/validate into typed domain objects,
+  - avoid `any` and broad `as` assertions in application code (note: migrations intentionally use `Kysely<any>` per Kysely guidance).
 
 ### Documentation
 
@@ -91,6 +95,7 @@ The parity source of truth is the legacy codebase (`bdastous_monorepo`).
   - shared projections (stable “what fields do we select” helpers),
   - shared joins (common relationships expressed once),
   - shared filters (soft-delete semantics, status predicates, etc.).
+- Prefer Kysely builders over raw SQL; use `sql` only for Postgres-specific features or tight performance needs, and keep it localized in `packages/db`.
 - Prefer cursor pagination (over offset pagination) for list endpoints:
   - use `kysely-cursor` (or an equivalent cursor helper) directly (no homegrown pagination implementation).
   - if we add helpers, keep them thin: centralize ordering rules + response shape, but do not reimplement token encoding/decoding.
@@ -145,6 +150,8 @@ The parity source of truth is the legacy codebase (`bdastous_monorepo`).
 ### BigInt in Node (Decision)
 
 - Configure `postgres` (postgres-js) so Postgres `bigint` is parsed as JavaScript `bigint` (not string).
+- Ensure DB type generation reflects runtime BigInt behavior:
+  - Postgres `bigint` columns should be generated/typed as TypeScript `bigint` (not `number`/`string`) to match driver parsing.
 - Treat JSON as a boundary format that cannot carry `bigint`:
   - accept ID inputs as strings and normalize to `bigint`,
   - emit IDs as strings in API responses and logs-as-data payloads (logs can still include numeric strings for readability).
@@ -452,6 +459,9 @@ For each invariant, record:
 - [ ] Integrate `kysely-codegen` for schema→types generation (or an equivalent approach).
   - [ ] Decide whether generated DB types are committed or generated in CI.
   - [ ] Add a stable command for regeneration and a diff check for accidental drift.
+  - [ ] Ensure generated types match runtime behavior:
+    - [ ] Postgres `bigint` → TypeScript `bigint` (aligned with postgres-js BigInt parsing).
+    - [ ] `json/jsonb` → `unknown` (or a safe JSON value type), decoded/validated at boundaries.
 - [ ] Implement DB module conventions.
   - [ ] connection pool configuration (timeouts, max connections, statement timeouts).
   - [ ] transaction helpers (explicit transaction boundaries in repositories/services).
@@ -463,6 +473,9 @@ For each invariant, record:
   - [ ] cursor pagination utilities using `kysely-cursor` (or equivalent).
     - [ ] define a shared cursor/page result shape and consistent ordering rules.
     - [ ] add tests for pagination stability (deterministic order + no duplicates across pages).
+  - [ ] When introducing a new Kysely pattern (upserts, JSONB operators, lateral joins, etc.):
+    - [ ] update `docs/runbooks/kysely.md`,
+    - [ ] prefer encoding the pattern as a reusable helper in `packages/db`.
 - [ ] Implement repositories for core graph and ingest metadata.
   - [ ] Users repository:
     - [ ] upsert by X user ID (`users.id`),
