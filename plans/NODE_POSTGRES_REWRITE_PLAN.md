@@ -67,6 +67,9 @@ The parity source of truth is the legacy codebase (`bdastous_monorepo`).
   - Postgres migrations (how they’re written/executed and operational safety controls),
   - Railway deploy shape (api + worker services, env vars/secrets, running ops via Railway SSH),
   - API/OpenAPI conventions (including BigInt-as-string at the HTTP boundary).
+- Kysely documentation is made actionable and version-accurate:
+  - a vendored snapshot of the Kysely docs for the pinned version,
+  - a repo runbook (`docs/runbooks/kysely.md`) plus a Codex skill (`kysely-workflows`) that references it.
 
 ### Configuration (Decision)
 
@@ -340,6 +343,12 @@ For each invariant, record:
   - [ ] Add a root `README.md` with local/dev quickstart and pointers to the plan.
   - [ ] Add `docs/runbooks/migrations.md` (how to author/run migrations; worker/CLI policy; safety notes).
   - [ ] Add `docs/runbooks/deploy-railway.md` (service shape + env vars + ops via Railway SSH).
+  - [ ] Vendor Kysely docs and make them actionable for implementation.
+    - [ ] Add a vendored snapshot under `docs/vendor/kysely/<version>/` matching the pinned `kysely` version.
+    - [ ] Add `docs/runbooks/kysely.md` with:
+      - [ ] a bdx-specific section (conventions and required patterns),
+      - [ ] a comprehensive index of the vendored upstream docs.
+    - [ ] Add a Codex skill under `.codex/skills/kysely-workflows/` that points to `docs/runbooks/kysely.md` and the vendored docs.
 - [ ] Confirm the exact “Must port” feature set by mapping each bullet in `docs/NODE_POSTGRES_REWRITE.md` to concrete behaviors and data invariants.
   - [ ] Enumerate all ingest job variants (followers, followings, posts) and their modes (incremental vs full refresh).
   - [ ] Enumerate all asset slugs and their params shapes from the current Python implementation.
