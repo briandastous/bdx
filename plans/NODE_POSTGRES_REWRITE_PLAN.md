@@ -57,6 +57,17 @@ The parity source of truth is the legacy codebase (`bdastous_monorepo`).
 - The repo builds, lints, typechecks, and tests in CI with reproducible installs via `pnpm-lock.yaml`.
 - TypeScript implementation and review follows `docs/typescript/best_practices` (deviations require explicit justification).
 
+### Documentation
+
+- The repo includes a minimal root `README.md` that is kept accurate as the implementation evolves:
+  - local/dev quickstart (Node/pnpm, Postgres via `docker-compose`, `.env.local`, `DEPLOY_ENV`, `pnpm dev`),
+  - migration workflow (how to author/execute migrations and the worker/CLI policy),
+  - pointers to `plans/NODE_POSTGRES_REWRITE_PLAN.md` and other key docs.
+- The repo includes lightweight runbooks for:
+  - Postgres migrations (how they’re written/executed and operational safety controls),
+  - Railway deploy shape (api + worker services, env vars/secrets, running ops via Railway SSH),
+  - API/OpenAPI conventions (including BigInt-as-string at the HTTP boundary).
+
 ### Configuration (Decision)
 
 - Use YAML overlays for **non-secret** configuration and environment variables for **secrets**:
@@ -325,6 +336,10 @@ For each invariant, record:
   - [ ] “Invariant Register” is seeded for core graph + ingest + assets (at minimum, everything we can extract from `dbschema/default.gel` plus key Python-enforced invariants like soft-delete/revive and membership snapshot/event consistency).
   - [ ] “Legacy Bugs / Feature Gaps” is actively maintained: any suspected legacy bug/behavior gap discovered during parity work is recorded here and surfaced to the owner for an explicit decision (port as-is vs fix vs defer).
   - [ ] A first-pass parity test matrix exists (linking “Must port” bullets to planned tests or explicit manual verification steps).
+- [ ] Establish baseline repo documentation (keep it minimal, but accurate).
+  - [ ] Add a root `README.md` with local/dev quickstart and pointers to the plan.
+  - [ ] Add `docs/runbooks/migrations.md` (how to author/run migrations; worker/CLI policy; safety notes).
+  - [ ] Add `docs/runbooks/deploy-railway.md` (service shape + env vars + ops via Railway SSH).
 - [ ] Confirm the exact “Must port” feature set by mapping each bullet in `docs/NODE_POSTGRES_REWRITE.md` to concrete behaviors and data invariants.
   - [ ] Enumerate all ingest job variants (followers, followings, posts) and their modes (incremental vs full refresh).
   - [ ] Enumerate all asset slugs and their params shapes from the current Python implementation.
@@ -570,6 +585,7 @@ For each invariant, record:
 - [ ] Generate OpenAPI docs from runtime validation schemas (Zod-first).
   - [ ] Pick and document the Zod→OpenAPI approach and keep it consistent across routes.
   - [ ] Serve an OpenAPI JSON document (e.g., `/openapi.json`) for agent/client consumption.
+  - [ ] Document API/OpenAPI conventions in `docs/runbooks/api.md` (ID formats, error shapes, pagination, auth).
 - [ ] Implement webhook ingestion endpoint(s).
   - [ ] token-based auth (query param or header).
   - [ ] runtime validation (Zod).
