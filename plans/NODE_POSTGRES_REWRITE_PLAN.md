@@ -377,6 +377,10 @@ The authoritative register is maintained in `docs/parity/invariant-register.md` 
 
 ### Phase 2: Postgres Schema Design (Core Graph + Ingest)
 
+- [ ] Use Phase 1 parity artifacts as inputs/checklists for Phase 2.
+  - [ ] Behavioral source of truth: `docs/parity/inventory.md` (ingest semantics + required fields).
+  - [ ] Invariants source of truth: `docs/parity/invariant-register.md` (update entries with concrete Postgres enforcement + test locations as they land).
+  - [ ] Coverage tracking: `docs/parity/test-matrix.md` and `docs/parity/legacy-tests.md` (mark coverage as implemented).
 - [ ] Establish the rewrite’s migration baseline (Option B).
   - [ ] Rewrite `packages/db/src/migrations/0001_init.ts` to create the foundation schema for the rewrite (extensions/enums/base tables as needed).
   - [ ] After `0001_init.ts` is rewritten for the rewrite, treat subsequent migrations as append-only and immutable.
@@ -384,7 +388,7 @@ The authoritative register is maintained in `docs/parity/invariant-register.md` 
   - [ ] Use `bigint generated always as identity` surrogate primary keys for internal tables.
   - [ ] Use upstream X/Twitter IDs as the primary keys for `users` and `posts` (`users.id`, `posts.id`).
 - [ ] Map legacy Gel constraints to Postgres constraints for core graph + ingest tables (using `dbschema/default.gel` as the source).
-  - [ ] For each invariant, choose enforcement per “Constraints (Policy)” and record it in the “Invariant Register”.
+  - [ ] For each invariant, choose enforcement per “Constraints (Policy)” and record it in `docs/parity/invariant-register.md`.
 - [ ] Design and implement migrations for core graph entities.
   - [ ] `users`
     - [ ] `id` is the X user ID (`bigint` primary key) + stable identity fields.
@@ -416,9 +420,13 @@ The authoritative register is maintained in `docs/parity/invariant-register.md` 
 
 ### Phase 3: Postgres Schema Design (Assets + Materializations + Membership)
 
+- [ ] Use Phase 1 parity artifacts as inputs/checklists for Phase 3.
+  - [ ] Behavioral source of truth: `docs/parity/inventory.md` (asset slugs/params shapes, membership semantics, “first appearance” rules).
+  - [ ] Invariants source of truth: `docs/parity/invariant-register.md` (update entries with concrete Postgres enforcement + test locations as they land).
+  - [ ] Coverage tracking: `docs/parity/test-matrix.md` and `docs/parity/legacy-tests.md` (mark coverage as implemented).
 - [ ] Map legacy Gel constraints to Postgres constraints for asset params/instances/materializations/events/membership (using `dbschema/default.gel` as the source).
   - [ ] Decide how to model “asset items” so membership/events can have enforceable uniqueness and (when possible) foreign keys.
-  - [ ] For each invariant, choose enforcement per “Constraints (Policy)” and record it in the “Invariant Register”.
+  - [ ] For each invariant, choose enforcement per “Constraints (Policy)” and record it in `docs/parity/invariant-register.md`.
 - [ ] Design and implement the foundational asset tables.
   - [ ] asset instance identity
     - [ ] `asset_params` (or per-slug params tables) with `(asset_slug, params_hash)` uniqueness.
