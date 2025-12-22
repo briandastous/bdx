@@ -7,7 +7,12 @@ export type Database = Record<string, unknown>;
 export type Db = Kysely<Database>;
 
 export function createDb(databaseUrl: string): Db {
-  const sql = postgres(databaseUrl, { max: 10 });
+  const sql = postgres(databaseUrl, {
+    max: 10,
+    types: {
+      bigint: postgres.BigInt,
+    },
+  });
   return new Kysely<Database>({
     dialect: new PostgresJSDialect({ postgres: sql }),
   });

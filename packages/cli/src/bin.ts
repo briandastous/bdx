@@ -10,7 +10,7 @@ if (!command) {
   process.exitCode = 2;
 } else if (command === "db:migrate") {
   const env = loadBaseEnv();
-  const logger = createLogger({ env: env.NODE_ENV, level: env.LOG_LEVEL, service: "cli" });
+  const logger = createLogger({ env: env.DEPLOY_ENV, level: env.LOG_LEVEL, service: "cli" });
   const db = createDb(env.DATABASE_URL);
 
   try {
@@ -26,4 +26,3 @@ if (!command) {
   console.error(`Unknown command: ${command}`);
   process.exitCode = 2;
 }
-

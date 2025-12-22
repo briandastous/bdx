@@ -9,6 +9,7 @@ describe("loadWorkerEnv", () => {
       DATABASE_URL: "postgres://example",
     });
 
+    expect(env.DEPLOY_ENV).toBe("development");
     expect(env.RUN_MIGRATIONS).toBe(true);
   });
 
@@ -22,5 +23,14 @@ describe("loadWorkerEnv", () => {
 
     expect(env.RUN_MIGRATIONS).toBe(false);
   });
-});
 
+  it("defaults DEPLOY_ENV to production when NODE_ENV=production", () => {
+    const env = loadWorkerEnv({
+      NODE_ENV: "production",
+      LOG_LEVEL: "info",
+      DATABASE_URL: "postgres://example",
+    });
+
+    expect(env.DEPLOY_ENV).toBe("production");
+  });
+});

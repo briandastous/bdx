@@ -4,7 +4,7 @@ import { createPinoOptions } from "@bdx/observability";
 import { buildServer } from "./server.js";
 
 const env = loadApiEnv();
-const loggerOptions = createPinoOptions({ env: env.NODE_ENV, level: env.LOG_LEVEL, service: "api" });
+const loggerOptions = createPinoOptions({ env: env.DEPLOY_ENV, level: env.LOG_LEVEL, service: "api" });
 
 const db = createDb(env.DATABASE_URL);
 const server = buildServer({ db, loggerOptions, webhookToken: env.WEBHOOK_TOKEN });
