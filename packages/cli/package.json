@@ -1,0 +1,19 @@
+{
+  "name": "@bdx/cli",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "bdx": "dist/bin.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsx watch src/bin.ts"
+  },
+  "dependencies": {
+    "@bdx/config": "workspace:*",
+    "@bdx/db": "workspace:*",
+    "@bdx/observability": "workspace:*"
+  }
+}

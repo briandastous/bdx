@@ -1,0 +1,17 @@
+{
+  "name": "@bdx/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@bdx/config": "workspace:*",
+    "@bdx/db": "workspace:*",
+    "@bdx/observability": "workspace:*",
+    "fastify": "^5.2.0",
+    "zod": "^3.24.1"
+  }
+}
