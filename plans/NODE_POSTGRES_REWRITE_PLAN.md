@@ -1,6 +1,6 @@
 # Node + Postgres Rewrite Plan (TypeScript + Kysely)
 
-This document turns `docs/NODE_POSTGRES_REWRITE.md` from research into an executable plan for this
+This document turns `docs/archive/NODE_POSTGRES_REWRITE_RESEARCH.md` from research into an executable plan for this
 repository. We will start fresh in Postgres (no data migration from Gel).
 
 ## Legacy Repo References
@@ -11,14 +11,14 @@ The parity source of truth is the legacy codebase (`bdastous_monorepo`).
 - Key docs to reference:
   - `docs/ANALYSIS.md` (architecture + data model)
   - `docs/CLI_REFERENCE.md` (operator surface, commands)
-  - `docs/NODE_POSTGRES_REWRITE.md` (scope decisions for this rewrite)
+  - `docs/archive/NODE_POSTGRES_REWRITE_RESEARCH.md` (scope decisions for this rewrite; research/provenance)
   - `dbschema/default.gel` (legacy schema + constraints)
 
 ## Goals / Non-Goals
 
 ### Goals
 
-- Achieve functional parity for everything under **“Must port (core product behavior)”** in `docs/NODE_POSTGRES_REWRITE.md`.
+- Achieve functional parity for everything under **“Must port (core product behavior)”** in `docs/archive/NODE_POSTGRES_REWRITE_RESEARCH.md`.
   - API details may change where TypeScript/Postgres best practices call for it, but the behaviors and invariants should match.
 - Replace Python + Gel with **Node.js (Active LTS only) + TypeScript (strict) + Postgres + Kysely**.
 - Preserve the product’s core conceptual model:
@@ -35,7 +35,7 @@ The parity source of truth is the legacy codebase (`bdastous_monorepo`).
 
 ### Non-Goals
 
-- Do not port anything listed under **“Do not port (Gel/Python-specific mechanics)”** in `docs/NODE_POSTGRES_REWRITE.md`, including:
+- Do not port anything listed under **“Do not port (Gel/Python-specific mechanics)”** in `docs/archive/NODE_POSTGRES_REWRITE_RESEARCH.md`, including:
   - Gel/EdgeQL schema and codegen workflows.
   - Prefect Cloud and its deployment model (the engine runner replaces it).
 - Do not port the Letta app/server (it is not part of the rewrite’s v1 scope or local/dev stack).
@@ -203,7 +203,7 @@ The parity source of truth is the legacy codebase (`bdastous_monorepo`).
 
 ### Parity + Divergence Policy
 
-- Match legacy behavior for everything under **“Must port (core product behavior)”** in `docs/NODE_POSTGRES_REWRITE.md`, unless we explicitly decide to diverge.
+- Match legacy behavior for everything under **“Must port (core product behavior)”** in `docs/archive/NODE_POSTGRES_REWRITE_RESEARCH.md`, unless we explicitly decide to diverge.
 - If we discover a likely **bug** or important **feature gap** in the legacy implementation, do not reproduce it by default.
   - Document it in this plan (see “Legacy Bugs / Feature Gaps”) with: legacy location, observed behavior, impact, and a proposed resolution.
   - Bring it to the project owner for an explicit decision (port as-is vs fix vs defer).
@@ -356,7 +356,7 @@ For each invariant, record:
       - [ ] a bdx-specific section (conventions and required patterns),
       - [ ] a comprehensive index of the vendored upstream docs.
     - [ ] Add a Codex skill under `.codex/skills/kysely-workflows/` that points to `docs/runbooks/kysely.md` and the vendored docs.
-- [ ] Confirm the exact “Must port” feature set by mapping each bullet in `docs/NODE_POSTGRES_REWRITE.md` to concrete behaviors and data invariants.
+- [ ] Confirm the exact “Must port” feature set by mapping each bullet in `docs/archive/NODE_POSTGRES_REWRITE_RESEARCH.md` to concrete behaviors and data invariants.
   - [ ] Enumerate all ingest job variants (followers, followings, posts) and their modes (incremental vs full refresh).
   - [ ] Enumerate all asset slugs and their params shapes from the current Python implementation.
     - [ ] For each asset slug, record:
