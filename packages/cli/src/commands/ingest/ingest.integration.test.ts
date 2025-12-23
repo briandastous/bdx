@@ -1,10 +1,7 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import {
-  type StartedPostgreSqlContainer,
-  PostgreSqlContainer,
-} from "@testcontainers/postgresql";
+import { type StartedPostgreSqlContainer, PostgreSqlContainer } from "@testcontainers/postgresql";
 import { createDb, destroyDb, migrateToLatest, type Db } from "@bdx/db";
 import IngestFollowers from "./followers.js";
 
@@ -49,7 +46,12 @@ async function createFixtureServer(): Promise<{ server: http.Server; url: string
     }
     if (url.pathname === "/twitter/user/followers") {
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ followers: [{ id: "10", userName: "follower", name: "Follower" }], next_cursor: null }));
+      res.end(
+        JSON.stringify({
+          followers: [{ id: "10", userName: "follower", name: "Follower" }],
+          next_cursor: null,
+        }),
+      );
       return;
     }
     res.writeHead(404, { "content-type": "application/json" });
@@ -104,7 +106,9 @@ describe("CLI ingest commands", () => {
 
   afterAll(async () => {
     await new Promise<void>((resolve) => {
-      server.close(() => resolve());
+      server.close(() => {
+        resolve();
+      });
     });
     await destroyDb(db);
     await container.stop();

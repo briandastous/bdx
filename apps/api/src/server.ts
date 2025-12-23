@@ -27,19 +27,21 @@ import { ingestIftttNewFollower } from "./services/ifttt.js";
 
 extendZodWithOpenApi(z);
 
-const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
-  z.union([
-    z.string(),
-    z.number(),
-    z.boolean(),
-    z.null(),
-    z.array(jsonValueSchema),
-    z.record(jsonValueSchema),
-  ]),
-).openapi({
-  type: "object",
-  additionalProperties: true,
-});
+const jsonValueSchema: z.ZodType<JsonValue> = z
+  .lazy(() =>
+    z.union([
+      z.string(),
+      z.number(),
+      z.boolean(),
+      z.null(),
+      z.array(jsonValueSchema),
+      z.record(jsonValueSchema),
+    ]),
+  )
+  .openapi({
+    type: "object",
+    additionalProperties: true,
+  });
 
 const idSchema = z.string().regex(/^\d+$/).openapi({ format: "int64" });
 const idParamSchema = z.object({ id: z.string().regex(/^\d+$/) });
@@ -199,8 +201,9 @@ function extractHandleFromProfileLink(link: string): string | null {
   const path = url.pathname.replace(/^\/+|\/+$/g, "");
   if (!path) return null;
 
-  const handle = path.split("/", 1)[0];
-  return handle || null;
+  const [handle] = path.split("/", 1);
+  if (!handle) return null;
+  return handle.length > 0 ? handle : null;
 }
 
 export function buildServer(params: {
@@ -273,8 +276,14 @@ export function buildServer(params: {
     path: "/v1/ingest/followers/{id}",
     request: { params: z.object({ id: idSchema }) },
     responses: {
-      200: { description: "Followers sync run", content: { "application/json": { schema: followersRunSchema } } },
-      404: { description: "Not found", content: { "application/json": { schema: errorResponseSchema } } },
+      200: {
+        description: "Followers sync run",
+        content: { "application/json": { schema: followersRunSchema } },
+      },
+      404: {
+        description: "Not found",
+        content: { "application/json": { schema: errorResponseSchema } },
+      },
     },
   });
 
@@ -283,8 +292,14 @@ export function buildServer(params: {
     path: "/v1/ingest/followings/{id}",
     request: { params: z.object({ id: idSchema }) },
     responses: {
-      200: { description: "Followings sync run", content: { "application/json": { schema: followingsRunSchema } } },
-      404: { description: "Not found", content: { "application/json": { schema: errorResponseSchema } } },
+      200: {
+        description: "Followings sync run",
+        content: { "application/json": { schema: followingsRunSchema } },
+      },
+      404: {
+        description: "Not found",
+        content: { "application/json": { schema: errorResponseSchema } },
+      },
     },
   });
 
@@ -293,8 +308,14 @@ export function buildServer(params: {
     path: "/v1/ingest/posts/{id}",
     request: { params: z.object({ id: idSchema }) },
     responses: {
-      200: { description: "Posts sync run", content: { "application/json": { schema: postsRunSchema } } },
-      404: { description: "Not found", content: { "application/json": { schema: errorResponseSchema } } },
+      200: {
+        description: "Posts sync run",
+        content: { "application/json": { schema: postsRunSchema } },
+      },
+      404: {
+        description: "Not found",
+        content: { "application/json": { schema: errorResponseSchema } },
+      },
     },
   });
 
@@ -303,8 +324,14 @@ export function buildServer(params: {
     path: "/v1/materializations/{id}",
     request: { params: z.object({ id: idSchema }) },
     responses: {
-      200: { description: "Asset materialization", content: { "application/json": { schema: materializationSchema } } },
-      404: { description: "Not found", content: { "application/json": { schema: errorResponseSchema } } },
+      200: {
+        description: "Asset materialization",
+        content: { "application/json": { schema: materializationSchema } },
+      },
+      404: {
+        description: "Not found",
+        content: { "application/json": { schema: errorResponseSchema } },
+      },
     },
   });
 
@@ -312,7 +339,10 @@ export function buildServer(params: {
     method: "get",
     path: "/v1/roots",
     responses: {
-      200: { description: "Enabled roots", content: { "application/json": { schema: rootsResponseSchema } } },
+      200: {
+        description: "Enabled roots",
+        content: { "application/json": { schema: rootsResponseSchema } },
+      },
     },
   });
 
@@ -400,7 +430,7 @@ export function buildServer(params: {
         "Persisted follower from webhook",
       );
 
-      return reply.status(200).headers({ "Cache-Control": "no-store" }).send({
+      return await reply.status(200).headers({ "Cache-Control": "no-store" }).send({
         status: "ok",
         message: "Webhook received successfully",
         handle: result.followerHandle,
@@ -505,8 +535,12 @@ export function buildServer(params: {
       completed_at: toIsoString(record.completedAt),
       trigger_reason: record.triggerReason,
       error_payload: record.errorPayload,
-      dependency_materialization_ids: record.dependencyMaterializationIds.map((id) => id.toString()),
-      requested_by_materialization_ids: record.requestedByMaterializationIds.map((id) => id.toString()),
+      dependency_materialization_ids: record.dependencyMaterializationIds.map((id) =>
+        id.toString(),
+      ),
+      requested_by_materialization_ids: record.requestedByMaterializationIds.map((id) =>
+        id.toString(),
+      ),
     });
   });
 

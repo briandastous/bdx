@@ -89,7 +89,10 @@ export class PostsSyncService {
     return this.syncPosts({ userIds: params.userIds, since: null });
   }
 
-  async syncPostsIncremental(params: { userIds: Iterable<bigint>; since: Date }): Promise<PostsSyncResult> {
+  async syncPostsIncremental(params: {
+    userIds: Iterable<bigint>;
+    since: Date;
+  }): Promise<PostsSyncResult> {
     if (!Number.isFinite(params.since.getTime())) {
       throw new Error("since must be a valid Date");
     }
@@ -205,13 +208,16 @@ export class PostsSyncService {
     try {
       for (const baseQuery of baseQueries) {
         let windowUntil: Date | null = null;
-        while (true) {
-          const boundedQuery = applyTimeBounds(baseQuery, { since: params.since, until: windowUntil });
+        for (;;) {
+          const boundedQuery = applyTimeBounds(baseQuery, {
+            since: params.since,
+            until: windowUntil,
+          });
           let cursor: string | null = null;
           let windowCount = 0;
           let windowOldest: Date | null = null;
 
-          while (true) {
+          for (;;) {
             let page;
             try {
               page = await this.client.fetchPostsPage(boundedQuery, cursor);
@@ -228,7 +234,10 @@ export class PostsSyncService {
               throw error;
             }
 
-            const { postRows, metaRows, usersMeta, postIds } = this.processPage(page.posts, syncRunId);
+            const { postRows, metaRows, usersMeta, postIds } = this.processPage(
+              page.posts,
+              syncRunId,
+            );
             postsRows.push(...postRows);
             postsMetaRows.push(...metaRows);
             for (const [userId, meta] of usersMeta.entries()) {
@@ -335,7 +344,7 @@ export class PostsSyncService {
     for (const userId of userIds) {
       try {
         const profile = await this.client.fetchUserProfileById(userId);
-        if (!profile || profile.userId === null) {
+        if (profile?.userId == null) {
           throw new PostsSyncError(`Unable to load profile for user id '${userId}'`, {
             status: "user-info",
           });

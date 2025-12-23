@@ -29,10 +29,7 @@ export async function insertSegmentEvents(
     is_first_appearance: event.isFirstAppearance,
   }));
 
-  const result = await db
-    .insertInto("segment_events")
-    .values(values)
-    .executeTakeFirst();
+  const result = await db.insertInto("segment_events").values(values).executeTakeFirst();
 
   return Number(result.numInsertedOrUpdatedRows ?? 0n);
 }
@@ -51,10 +48,7 @@ export async function insertPostCorpusEvents(
     is_first_appearance: event.isFirstAppearance,
   }));
 
-  const result = await db
-    .insertInto("post_corpus_events")
-    .values(values)
-    .executeTakeFirst();
+  const result = await db.insertInto("post_corpus_events").values(values).executeTakeFirst();
 
   return Number(result.numInsertedOrUpdatedRows ?? 0n);
 }
@@ -198,7 +192,10 @@ async function getMaterializationOrdering(
   };
 }
 
-async function getCurrentMembershipMaterializationId(db: DbOrTx, instanceId: bigint): Promise<bigint> {
+async function getCurrentMembershipMaterializationId(
+  db: DbOrTx,
+  instanceId: bigint,
+): Promise<bigint> {
   const row = await db
     .selectFrom("asset_instances")
     .select(["current_membership_materialization_id"])
@@ -207,7 +204,9 @@ async function getCurrentMembershipMaterializationId(db: DbOrTx, instanceId: big
 
   const current = row?.current_membership_materialization_id ?? null;
   if (!current) {
-    throw new Error(`Missing current membership materialization for instance ${instanceId.toString()}`);
+    throw new Error(
+      `Missing current membership materialization for instance ${instanceId.toString()}`,
+    );
   }
   return current;
 }
@@ -314,7 +313,7 @@ export async function rebuildSegmentMembershipSnapshot(
     .limit(1)
     .executeTakeFirst();
 
-  if (!latest || !latest.completed_at) {
+  if (!latest?.completed_at) {
     await updateCurrentMembershipMaterialization(db, { instanceId, materializationId: null });
     return { materializationId: null, memberCount: 0 };
   }
@@ -361,7 +360,7 @@ export async function rebuildPostCorpusMembershipSnapshot(
     .limit(1)
     .executeTakeFirst();
 
-  if (!latest || !latest.completed_at) {
+  if (!latest?.completed_at) {
     await updateCurrentMembershipMaterialization(db, { instanceId, materializationId: null });
     return { materializationId: null, memberCount: 0 };
   }

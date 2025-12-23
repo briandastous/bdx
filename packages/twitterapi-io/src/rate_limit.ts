@@ -13,7 +13,7 @@ class RateLimiter {
   }
 
   async wait(): Promise<void> {
-    let release: () => void = () => {};
+    let release: () => void = () => undefined;
     const next = new Promise<void>((resolve) => {
       release = resolve;
     });

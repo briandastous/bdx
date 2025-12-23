@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Db, DbOrTx } from "@bdx/db";
+import type { Db, DbOrTx, AssetInstanceRecord, AssetParamsRecord, AssetSlug } from "@bdx/db";
 import {
   acquireAdvisoryLock,
   createAssetMaterialization,
@@ -32,7 +32,6 @@ import {
   updateAssetMaterialization,
   withTransaction,
 } from "@bdx/db";
-import type { AssetInstanceRecord, AssetParamsRecord, AssetSlug } from "@bdx/db";
 import type { Logger } from "@bdx/observability";
 import {
   FollowersSyncService,
@@ -43,7 +42,7 @@ import {
   PostsSyncRateLimitError,
   PostsSyncService,
 } from "@bdx/ingest";
-import { TwitterApiClient } from "@bdx/twitterapi-io";
+import type { TwitterApiClient } from "@bdx/twitterapi-io";
 import type { AssetParams } from "./assets/params.js";
 import { PARAMS_HASH_VERSION, formatAssetParams, paramsHashV1 } from "./assets/params.js";
 import { getAssetDefinition } from "./assets/registry.js";
@@ -134,8 +133,6 @@ export class AssetEngine {
   }
 
   async tick(signal: AbortSignal): Promise<void> {
-    if (signal.aborted) return;
-
     const plannerRunId = randomUUID();
     const memo = new Map<bigint, Promise<MaterializationOutcome>>();
     const tickLogger = this.logger.child({ planner_run_id: plannerRunId });
@@ -144,7 +141,9 @@ export class AssetEngine {
 
     const roots = await listEnabledAssetInstanceRoots(this.db);
     for (const root of roots) {
-      if (signal.aborted) break;
+      if (signal.aborted) {
+        break;
+      }
       await this.materializeInstance(root.instanceId, {
         memo,
         plannerRunId,
@@ -155,7 +154,9 @@ export class AssetEngine {
 
     const fanoutRoots = await listEnabledAssetInstanceFanoutRoots(this.db);
     for (const root of fanoutRoots) {
-      if (signal.aborted) break;
+      if (signal.aborted) {
+        break;
+      }
       await this.materializeFanoutRoot(root, { memo, plannerRunId, signal });
     }
 
@@ -168,7 +169,11 @@ export class AssetEngine {
       targetAssetSlug: AssetSlug;
       fanoutMode: "global_per_item" | "scoped_by_source";
     },
-    params: { memo: Map<bigint, Promise<MaterializationOutcome>>; plannerRunId: string; signal: AbortSignal },
+    params: {
+      memo: Map<bigint, Promise<MaterializationOutcome>>;
+      plannerRunId: string;
+      signal: AbortSignal;
+    },
   ): Promise<void> {
     const sourceOutcome = await this.materializeInstance(root.sourceInstanceId, {
       memo: params.memo,
@@ -448,74 +453,78 @@ export class AssetEngine {
     }
 
     const lockKey = instanceId;
-    const outcome = await withTransaction(this.db, async (trx): Promise<MaterializationOutcome | null> => {
-      const acquired = await acquireAdvisoryLock(trx, lockKey, {
-        timeoutMs: this.lockTimeoutMs,
-      });
-      if (!acquired) {
-        return null;
-      }
-
-      let materializationId: bigint | null = null;
-      try {
-        this.logger.info(
-          {
-            asset_instance_id: instanceId.toString(),
-            asset_slug: instance.assetSlug,
-            planner_run_id: options.plannerRunId,
-            trigger_reason: options.triggerReason,
-          },
-          "Materialization started",
-        );
-        const materialization = await createAssetMaterialization(trx, {
-          assetInstanceId: instanceId,
-          assetSlug: instance.assetSlug,
-          inputsHash: inputsHash.hash,
-          inputsHashVersion: inputsHash.version,
-          dependencyRevisionsHash: dependencyRevisionsHash.hash,
-          dependencyRevisionsHashVersion: dependencyRevisionsHash.version,
-          triggerReason: options.triggerReason,
+    const outcome = await withTransaction(
+      this.db,
+      async (trx): Promise<MaterializationOutcome | null> => {
+        const acquired = await acquireAdvisoryLock(trx, lockKey, {
+          timeoutMs: this.lockTimeoutMs,
         });
-        materializationId = materialization.id;
-
-        if (dependencies.length > 0) {
-          await insertMaterializationDependencies(
-            trx,
-            materialization.id,
-            dependencies.map((dep) => dep.materializationId),
-          );
-        }
-        if (options.requestedByMaterializationIds.length > 0) {
-          await insertMaterializationRequests(
-            trx,
-            materialization.id,
-            options.requestedByMaterializationIds,
-          );
+        if (!acquired) {
+          return null;
         }
 
-        await this.ensureCheckpoint(trx, instance, definition.outputItemKind, options.plannerRunId);
+        let materializationId: bigint | null = null;
+        try {
+          this.logger.info(
+            {
+              asset_instance_id: instanceId.toString(),
+              asset_slug: instance.assetSlug,
+              planner_run_id: options.plannerRunId,
+              trigger_reason: options.triggerReason,
+            },
+            "Materialization started",
+          );
+          const materialization = await createAssetMaterialization(trx, {
+            assetInstanceId: instanceId,
+            assetSlug: instance.assetSlug,
+            inputsHash: inputsHash.hash,
+            inputsHashVersion: inputsHash.version,
+            dependencyRevisionsHash: dependencyRevisionsHash.hash,
+            dependencyRevisionsHashVersion: dependencyRevisionsHash.version,
+            triggerReason: options.triggerReason,
+          });
+          materializationId = materialization.id;
 
-        const membership = await definition.computeMembership(params, dependencies, {
-          db: trx,
-          instanceId,
-        });
-        const previousMembership =
-          definition.outputItemKind === "user"
-            ? await listSegmentMembershipSnapshot(trx, instanceId)
-            : await listPostCorpusMembershipSnapshot(trx, instanceId);
+          if (dependencies.length > 0) {
+            await insertMaterializationDependencies(
+              trx,
+              materialization.id,
+              dependencies.map((dep) => dep.materializationId),
+            );
+          }
+          if (options.requestedByMaterializationIds.length > 0) {
+            await insertMaterializationRequests(
+              trx,
+              materialization.id,
+              options.requestedByMaterializationIds,
+            );
+          }
 
-        const previousSet = new Set(previousMembership);
-        const currentSet = new Set(membership);
-
-        const enterItems = membership.filter((id) => !previousSet.has(id));
-        const exitItems = previousMembership.filter((id) => !currentSet.has(id));
-
-        if (definition.outputItemKind === "user") {
-          const seen = await listSegmentEnteredUserIds(trx, instanceId);
-          await insertSegmentEvents(
+          await this.ensureCheckpoint(
             trx,
-            materialization.id,
-            [
+            instance,
+            definition.outputItemKind,
+            options.plannerRunId,
+          );
+
+          const membership = await definition.computeMembership(params, dependencies, {
+            db: trx,
+            instanceId,
+          });
+          const previousMembership =
+            definition.outputItemKind === "user"
+              ? await listSegmentMembershipSnapshot(trx, instanceId)
+              : await listPostCorpusMembershipSnapshot(trx, instanceId);
+
+          const previousSet = new Set(previousMembership);
+          const currentSet = new Set(membership);
+
+          const enterItems = membership.filter((id) => !previousSet.has(id));
+          const exitItems = previousMembership.filter((id) => !currentSet.has(id));
+
+          if (definition.outputItemKind === "user") {
+            const seen = await listSegmentEnteredUserIds(trx, instanceId);
+            await insertSegmentEvents(trx, materialization.id, [
               ...enterItems.map((userId) => ({
                 userId,
                 eventType: "enter" as const,
@@ -526,14 +535,10 @@ export class AssetEngine {
                 eventType: "exit" as const,
                 isFirstAppearance: null,
               })),
-            ],
-          );
-        } else {
-          const seen = await listPostCorpusEnteredPostIds(trx, instanceId);
-          await insertPostCorpusEvents(
-            trx,
-            materialization.id,
-            [
+            ]);
+          } else {
+            const seen = await listPostCorpusEnteredPostIds(trx, instanceId);
+            await insertPostCorpusEvents(trx, materialization.id, [
               ...enterItems.map((postId) => ({
                 postId,
                 eventType: "enter" as const,
@@ -544,83 +549,83 @@ export class AssetEngine {
                 eventType: "exit" as const,
                 isFirstAppearance: null,
               })),
-            ],
-          );
-        }
+            ]);
+          }
 
-        const previousRevision = latestSuccess?.outputRevision ?? 0n;
-        const membershipChanged = enterItems.length > 0 || exitItems.length > 0;
-        const outputRevision = membershipChanged ? previousRevision + 1n : previousRevision;
+          const previousRevision = latestSuccess?.outputRevision ?? 0n;
+          const membershipChanged = enterItems.length > 0 || exitItems.length > 0;
+          const outputRevision = membershipChanged ? previousRevision + 1n : previousRevision;
 
-        if (definition.outputItemKind === "user") {
-          await replaceSegmentMembershipSnapshot(trx, {
-            instanceId,
-            materializationId: materialization.id,
-            userIds: membership,
-          });
-        } else {
-          await replacePostCorpusMembershipSnapshot(trx, {
-            instanceId,
-            materializationId: materialization.id,
-            postIds: membership,
-          });
-        }
+          if (definition.outputItemKind === "user") {
+            await replaceSegmentMembershipSnapshot(trx, {
+              instanceId,
+              materializationId: materialization.id,
+              userIds: membership,
+            });
+          } else {
+            await replacePostCorpusMembershipSnapshot(trx, {
+              instanceId,
+              materializationId: materialization.id,
+              postIds: membership,
+            });
+          }
 
-        await updateAssetMaterialization(trx, materialization.id, {
-          status: "success",
-          completedAt: new Date(),
-          outputRevision,
-          errorPayload: null,
-        });
-
-        this.logger.info(
-          {
-            asset_instance_id: instanceId.toString(),
-            asset_slug: instance.assetSlug,
-            materialization_id: materialization.id.toString(),
-            output_revision: outputRevision.toString(),
-            member_count: membership.length,
-            planner_run_id: options.plannerRunId,
-          },
-          "Materialization completed",
-        );
-
-        return {
-          instanceId,
-          materializationId: materialization.id,
-          outputRevision,
-          status: "success",
-        } satisfies MaterializationOutcome;
-      } catch (error) {
-        if (materializationId) {
-          await updateAssetMaterialization(trx, materializationId, {
-            status: "error",
+          await updateAssetMaterialization(trx, materialization.id, {
+            status: "success",
             completedAt: new Date(),
-            outputRevision: 0n,
-            errorPayload: serializeError(error),
+            outputRevision,
+            errorPayload: null,
           });
+
+          this.logger.info(
+            {
+              asset_instance_id: instanceId.toString(),
+              asset_slug: instance.assetSlug,
+              materialization_id: materialization.id.toString(),
+              output_revision: outputRevision.toString(),
+              member_count: membership.length,
+              planner_run_id: options.plannerRunId,
+            },
+            "Materialization completed",
+          );
+
+          return {
+            instanceId,
+            materializationId: materialization.id,
+            outputRevision,
+            status: "success",
+          } satisfies MaterializationOutcome;
+        } catch (error) {
+          if (materializationId) {
+            await updateAssetMaterialization(trx, materializationId, {
+              status: "error",
+              completedAt: new Date(),
+              outputRevision: 0n,
+              errorPayload: serializeError(error),
+            });
+          }
+          this.logger.error(
+            {
+              asset_instance_id: instanceId.toString(),
+              asset_slug: instance.assetSlug,
+              materialization_id: materializationId ? materializationId.toString() : null,
+              planner_run_id: options.plannerRunId,
+              error,
+            },
+            "Materialization failed",
+          );
+          return {
+            instanceId,
+            materializationId: null,
+            outputRevision: null,
+            status: "error",
+            errorMessage: error instanceof Error ? error.message : "Unknown error",
+          };
+        } finally {
+          await releaseAdvisoryLock(trx, instanceId);
         }
-        this.logger.error(
-          {
-            asset_instance_id: instanceId.toString(),
-            asset_slug: instance.assetSlug,
-            materialization_id: materializationId ? materializationId.toString() : null,
-            planner_run_id: options.plannerRunId,
-            error,
-          },
-          "Materialization failed",
-        );
-        return {
-          instanceId,
-          materializationId: null,
-          outputRevision: null,
-          status: "error",
-          errorMessage: error instanceof Error ? error.message : "Unknown error",
-        };
-      } finally {
-        await releaseAdvisoryLock(trx, instanceId);
-      }
-    });
+      },
+    );
 
     if (!outcome) {
       await this.recordDecision({
@@ -790,7 +795,10 @@ export class AssetEngine {
         if (!ran) return false;
       }
       if (posts.size > 0) {
-        const lockKey = `ingest:posts:${Array.from(posts).map((id) => id.toString()).sort().join(",")}`;
+        const lockKey = `ingest:posts:${Array.from(posts)
+          .map((id) => id.toString())
+          .sort()
+          .join(",")}`;
         const result = await this.withIngestLock(
           lockKey,
           { plannerRunId: params.plannerRunId, paramsLabel: params.paramsLabel, targetId: null },
@@ -798,7 +806,11 @@ export class AssetEngine {
         );
         if (!result) return false;
         if (postsRequestedBy.size > 0) {
-          await linkPostsSyncRunToMaterializations(this.db, result.syncRunId, Array.from(postsRequestedBy));
+          await linkPostsSyncRunToMaterializations(
+            this.db,
+            result.syncRunId,
+            Array.from(postsRequestedBy),
+          );
         }
       }
       return true;
@@ -981,7 +993,10 @@ export class AssetEngine {
   }
 }
 
-function computeDependencyRevisionsHash(deps: ResolvedDependency[]): { hash: string; version: HashVersion } {
+function computeDependencyRevisionsHash(deps: ResolvedDependency[]): {
+  hash: string;
+  version: HashVersion;
+} {
   if (deps.length === 0) return hashPartsV1(["kind=dependency_revisions_hash:v1"]);
 
   const sorted = [...deps].sort((left, right) => {

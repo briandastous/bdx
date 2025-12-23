@@ -13,7 +13,7 @@ function loadFixture(path: string): unknown {
 }
 
 function createFetch(responseFactory: () => Response): typeof fetch {
-  return async () => responseFactory();
+  return () => Promise.resolve(responseFactory());
 }
 
 function createClient(responseFactory: () => Response): TwitterApiClient {
@@ -90,9 +90,7 @@ describe("TwitterApiClient", () => {
 
   it("parses follower fixtures into typed pages", async () => {
     const payload = loadFixture("./__fixtures__/followers_page.json");
-    const client = createClient(
-      () => new Response(JSON.stringify(payload), { status: 200 }),
-    );
+    const client = createClient(() => new Response(JSON.stringify(payload), { status: 200 }));
 
     const page = await client.fetchFollowersPage("example");
     expect(page.followers[0]?.userId).toBe(101n);
@@ -103,9 +101,7 @@ describe("TwitterApiClient", () => {
 
   it("parses followings fixtures into typed pages", async () => {
     const payload = loadFixture("./__fixtures__/followings_page.json");
-    const client = createClient(
-      () => new Response(JSON.stringify(payload), { status: 200 }),
-    );
+    const client = createClient(() => new Response(JSON.stringify(payload), { status: 200 }));
 
     const page = await client.fetchFollowingsPage("example");
     expect(page.followings[0]?.userId).toBe(202n);
@@ -116,9 +112,7 @@ describe("TwitterApiClient", () => {
 
   it("parses user batch fixtures", async () => {
     const payload = loadFixture("./__fixtures__/user_batch.json");
-    const client = createClient(
-      () => new Response(JSON.stringify(payload), { status: 200 }),
-    );
+    const client = createClient(() => new Response(JSON.stringify(payload), { status: 200 }));
 
     const user = await client.fetchUserProfileById(101n);
     expect(user?.userId).toBe(101n);
@@ -127,9 +121,7 @@ describe("TwitterApiClient", () => {
 
   it("parses posts fixtures into typed pages", async () => {
     const payload = loadFixture("./__fixtures__/posts_page.json");
-    const client = createClient(
-      () => new Response(JSON.stringify(payload), { status: 200 }),
-    );
+    const client = createClient(() => new Response(JSON.stringify(payload), { status: 200 }));
 
     const page = await client.fetchPostsPage("from:alice");
     expect(page.posts[0]?.postId).toBe(500n);

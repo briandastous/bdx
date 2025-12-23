@@ -119,7 +119,7 @@ export async function updateAssetMaterialization(
     .where("id", "=", materializationId)
     .executeTakeFirst();
 
-  return Number(result.numUpdatedRows ?? 0n);
+  return Number(result.numUpdatedRows);
 }
 
 export async function getAssetMaterializationById(

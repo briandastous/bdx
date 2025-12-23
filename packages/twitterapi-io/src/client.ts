@@ -1,13 +1,9 @@
 import type {
   FollowersItem,
-  FollowersResponse,
   FollowingsItem,
-  FollowingsResponse,
-  PostsResponse,
   TweetItem,
   UserBatchItem,
-  UserBatchResponse,
-  UserInfoResponse,
+  UserInfoData,
 } from "./api_types.js";
 import { convertTweet, convertUser } from "./conversions.js";
 import {
@@ -57,11 +53,12 @@ export class TwitterApiClient {
 
   async fetchUserProfileByHandle(handle: string): Promise<XUserData | null> {
     const { json } = await this.requestJson("/twitter/user/info", { userName: handle });
-    const payload = json as UserInfoResponse;
-    const data = payload?.data ?? null;
-    if (!data) {
-      const params: { status?: number; request?: RequestSnapshot; response?: ResponseSnapshot } = {};
-      if (payload) params.status = 200;
+    const payload = ensureJsonObject(json, "user info response");
+    const data = payload["data"];
+    if (!isUserInfoData(data)) {
+      const params: { status?: number; request?: RequestSnapshot; response?: ResponseSnapshot } =
+        {};
+      params.status = 200;
       if (this.lastRequest) params.request = this.lastRequest;
       if (this.lastResponse) params.response = this.lastResponse;
       throw new TwitterApiUnexpectedResponseError("User info response missing data", params);
@@ -73,8 +70,8 @@ export class TwitterApiClient {
     const { json } = await this.requestJson("/twitter/user/batch_info_by_ids", {
       userIds: userId.toString(),
     });
-    const payload = json as UserBatchResponse;
-    const users = (payload?.users ?? []) as UserBatchItem[];
+    const payload = ensureJsonObject(json, "user batch response");
+    const users = asJsonArray(payload["users"]).filter(isUserBatchItem);
     if (users.length === 0) return null;
 
     const match = users.find((user) => user.id === userId.toString());
@@ -89,9 +86,8 @@ export class TwitterApiClient {
       cursor: cursor ?? undefined,
       pageSize: 200,
     });
-    const payload = json as FollowersResponse;
     const raw = ensureJsonObject(json, "followers response");
-    const followers = (payload?.followers ?? []) as FollowersItem[];
+    const followers = asJsonArray(raw["followers"]).filter(isFollowersItem);
     const converted = followers.map(convertUser);
     const nextCursor = chooseCursor([raw]);
     const hasNextPage = chooseHasNext([raw], undefined, nextCursor);
@@ -112,9 +108,8 @@ export class TwitterApiClient {
       cursor: cursor ?? undefined,
       pageSize: 200,
     });
-    const payload = json as FollowingsResponse;
     const raw = ensureJsonObject(json, "followings response");
-    const followings = (payload?.followings ?? []) as FollowingsItem[];
+    const followings = asJsonArray(raw["followings"]).filter(isFollowingsItem);
     const converted = followings.map(convertUser);
     const nextCursor = chooseCursor([raw]);
     const hasNextPage = chooseHasNext([raw], undefined, nextCursor);
@@ -136,10 +131,11 @@ export class TwitterApiClient {
       cursor: cursor ?? undefined,
     });
 
-    const payload = json as PostsResponse;
     const raw = ensureJsonObject(json, "posts response");
-    const tweets = (payload?.tweets ?? []) as TweetItem[];
-    const posts = tweets.map(convertTweet).filter((item): item is NonNullable<typeof item> => Boolean(item));
+    const tweets = asJsonArray(raw["tweets"]).filter(isTweetItem);
+    const posts = tweets
+      .map(convertTweet)
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
     const nextCursor = chooseCursor([raw]);
     const hasNextPage = chooseHasNext([raw], undefined, nextCursor);
 
@@ -229,14 +225,11 @@ export class TwitterApiClient {
     }
 
     if (response.status >= 500) {
-      throw new TwitterApiUnexpectedResponseError(
-        `twitterapi.io returned ${response.status}`,
-        {
-          status: response.status,
-          request: requestSnapshot,
-          response: responseSnapshot,
-        },
-      );
+      throw new TwitterApiUnexpectedResponseError(`twitterapi.io returned ${response.status}`, {
+        status: response.status,
+        request: requestSnapshot,
+        response: responseSnapshot,
+      });
     }
 
     if (response.status >= 400) {
@@ -265,17 +258,54 @@ function maskHeaders(headers: Record<string, string>): Record<string, string> {
   return masked;
 }
 
-function ensureJsonObject(value: JsonValue, label: string): JsonObject {
-  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-    return value as JsonObject;
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isJsonValue(value: unknown): value is JsonValue {
+  if (value === null) return true;
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return true;
   }
+  if (Array.isArray(value)) {
+    return value.every(isJsonValue);
+  }
+  return isJsonObject(value);
+}
+
+function ensureJsonObject(value: unknown, label: string): JsonObject {
+  if (isJsonObject(value)) return value;
   throw new TwitterApiUnexpectedResponseError(`twitterapi.io returned non-object ${label}`);
 }
 
 function extractMessage(value: JsonValue): string | null {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
-  const message = (value as JsonObject)["message"];
+  if (!isJsonObject(value)) return null;
+  const message = value["message"];
   return typeof message === "string" ? message : null;
+}
+
+function asJsonArray(value: unknown): JsonValue[] {
+  return Array.isArray(value) ? value.filter(isJsonValue) : [];
+}
+
+function isUserInfoData(value: unknown): value is UserInfoData {
+  return isJsonObject(value);
+}
+
+function isUserBatchItem(value: unknown): value is UserBatchItem {
+  return isJsonObject(value);
+}
+
+function isFollowersItem(value: unknown): value is FollowersItem {
+  return isJsonObject(value);
+}
+
+function isFollowingsItem(value: unknown): value is FollowingsItem {
+  return isJsonObject(value);
+}
+
+function isTweetItem(value: unknown): value is TweetItem {
+  return isJsonObject(value);
 }
 
 function parseRetryAfterSeconds(response: Response): number | null {

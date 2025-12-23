@@ -9,7 +9,11 @@ export type SpecifiedUsersSegmentParams = {
 };
 
 export type SubjectSegmentParams = {
-  assetSlug: "segment_followers" | "segment_followed" | "segment_mutuals" | "segment_unreciprocated_followed";
+  assetSlug:
+    | "segment_followers"
+    | "segment_followed"
+    | "segment_mutuals"
+    | "segment_unreciprocated_followed";
   subjectExternalId: bigint;
   fanoutSourceParamsHash: string | null;
 };
@@ -26,17 +30,15 @@ export type AssetParams = SegmentParams | PostCorpusForSegmentParams;
 
 export const PARAMS_HASH_VERSION = HASH_VERSION_V1;
 
-const bigintSchema = z
-  .union([z.string(), z.number().int(), z.bigint()])
-  .transform((value) => {
-    if (typeof value === "bigint") return value;
-    if (typeof value === "number") return BigInt(value);
-    const trimmed = value.trim();
-    if (trimmed.length === 0) {
-      throw new Error("Expected bigint string");
-    }
-    return BigInt(trimmed);
-  });
+const bigintSchema = z.union([z.string(), z.number().int(), z.bigint()]).transform((value) => {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number") return BigInt(value);
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    throw new Error("Expected bigint string");
+  }
+  return BigInt(trimmed);
+});
 
 const fanoutSchema = z.object({
   fanoutSourceParamsHash: z.string().min(1).optional().nullable(),
@@ -110,8 +112,8 @@ const assetParamsSchema = z
   });
 
 export function parseAssetParams(slug: AssetSlug, input: unknown): AssetParams {
-  const base = typeof input === "object" && input !== null ? input : {};
-  const result = assetParamsSchema.safeParse({ assetSlug: slug, ...(base as object) });
+  const base = typeof input === "object" && input !== null ? input : null;
+  const result = assetParamsSchema.safeParse({ assetSlug: slug, ...(base ?? {}) });
   if (!result.success) {
     throw new Error(`Invalid params for asset ${slug}: ${result.error.message}`);
   }

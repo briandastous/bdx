@@ -5,6 +5,8 @@ import type { AssetParams } from "./params.js";
 
 export type AssetItemKind = "user" | "post";
 
+export type Awaitable<T> = T | Promise<T>;
+
 export interface DependencySpec {
   name: string;
   assetSlug: AssetSlug;

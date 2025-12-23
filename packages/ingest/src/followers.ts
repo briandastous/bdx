@@ -25,7 +25,12 @@ export interface FollowersSyncResult {
 const FOLLOWERS_INGEST_KIND: IngestKind = "twitterio_api_user_followers";
 
 export class FollowersSyncService extends BaseGraphSyncService<FollowersPage> {
-  constructor(params: { db: Db; logger: Logger; client: TwitterApiClient; httpSnapshotMaxBytes?: number }) {
+  constructor(params: {
+    db: Db;
+    logger: Logger;
+    client: TwitterApiClient;
+    httpSnapshotMaxBytes?: number;
+  }) {
     const orientation: GraphSyncOrientation = {
       ingestKind: FOLLOWERS_INGEST_KIND,
       primaryIsTarget: true,
@@ -106,7 +111,7 @@ export class FollowersSyncService extends BaseGraphSyncService<FollowersPage> {
     primaryProfile: XUserData | null,
     primaryUserId: bigint,
   ): string {
-    if (!primaryProfile || primaryProfile.userId === null) {
+    if (primaryProfile?.userId == null) {
       throw new GraphSyncError(`Unable to load profile for user id '${primaryUserId}'`, {
         status: "user-info",
       });

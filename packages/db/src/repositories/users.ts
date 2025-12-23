@@ -321,5 +321,5 @@ export async function markUsersSoftDeleted(db: DbOrTx, userIds: bigint[]): Promi
     .where("id", "in", userIds)
     .executeTakeFirst();
 
-  return Number(result.numUpdatedRows ?? 0n);
+  return Number(result.numUpdatedRows);
 }

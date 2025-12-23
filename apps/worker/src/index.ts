@@ -19,8 +19,12 @@ const logger = createLogger({ env: env.DEPLOY_ENV, level: env.LOG_LEVEL, service
 const db = createDb(env.DATABASE_URL, env.db);
 
 const abortController = new AbortController();
-process.once("SIGINT", () => abortController.abort());
-process.once("SIGTERM", () => abortController.abort());
+process.once("SIGINT", () => {
+  abortController.abort();
+});
+process.once("SIGTERM", () => {
+  abortController.abort();
+});
 
 function rateLimitQpsToMinIntervalMs(rateLimitQps: number): number {
   return Math.ceil(1000 / rateLimitQps);
@@ -93,7 +97,7 @@ try {
   if (env.retention.enabled) {
     await runRetentionOnce();
     retentionTimer = setInterval(() => {
-      void runRetentionOnce().catch((error) => {
+      void runRetentionOnce().catch((error: unknown) => {
         logger.warn({ error }, "retention run failed");
       });
     }, env.retention.periodMs);
@@ -101,7 +105,7 @@ try {
 
   await recordHeartbeat();
   heartbeatTimer = setInterval(() => {
-    void recordHeartbeat().catch((error) => {
+    void recordHeartbeat().catch((error: unknown) => {
       logger.warn({ error }, "failed to record worker heartbeat");
     });
   }, heartbeatIntervalMs);
@@ -122,7 +126,7 @@ try {
       logger.error({ error }, "engine tick failed");
     },
   });
-} catch (error) {
+} catch (error: unknown) {
   logger.error({ error }, "worker failed");
   process.exitCode = 1;
 } finally {
@@ -134,7 +138,9 @@ try {
   }
   if (healthServer) {
     await new Promise<void>((resolve) => {
-      healthServer?.close(() => resolve());
+      healthServer?.close(() => {
+        resolve();
+      });
     });
   }
   await destroyDb(db);

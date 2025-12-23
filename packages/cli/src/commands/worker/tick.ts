@@ -2,7 +2,12 @@ import { Command } from "@oclif/core";
 import { loadWorkerEnv } from "@bdx/config";
 import { migrateToLatestWithLock } from "@bdx/db";
 import { AssetEngine, runEngineLoop } from "@bdx/engine";
-import { createDbFromEnv, createLoggerFromEnv, createTwitterClient, destroyDbSafely } from "../../lib/context.js";
+import {
+  createDbFromEnv,
+  createLoggerFromEnv,
+  createTwitterClient,
+  destroyDbSafely,
+} from "../../lib/context.js";
 
 export default class WorkerTick extends Command {
   static override description = "Run a single asset engine tick and exit.";
@@ -13,8 +18,12 @@ export default class WorkerTick extends Command {
     const db = createDbFromEnv(env);
 
     const abortController = new AbortController();
-    process.once("SIGINT", () => abortController.abort());
-    process.once("SIGTERM", () => abortController.abort());
+    process.once("SIGINT", () => {
+      abortController.abort();
+    });
+    process.once("SIGTERM", () => {
+      abortController.abort();
+    });
 
     try {
       if (env.RUN_MIGRATIONS) {

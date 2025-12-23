@@ -61,8 +61,8 @@ export async function runRetention(
     .executeTakeFirst();
 
   return {
-    plannerEventsDeleted: Number(plannerResult.numDeletedRows ?? 0n),
-    ingestEventsDeleted: Number(ingestResult.numDeletedRows ?? 0n),
-    webhookEventsDeleted: Number(webhookResult.numDeletedRows ?? 0n),
+    plannerEventsDeleted: Number(plannerResult.numDeletedRows),
+    ingestEventsDeleted: Number(ingestResult.numDeletedRows),
+    webhookEventsDeleted: Number(webhookResult.numDeletedRows),
   };
 }

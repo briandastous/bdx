@@ -178,7 +178,10 @@ export async function createFollowingsSyncRun(
   });
 }
 
-export async function createPostsSyncRun(db: DbOrTx, input: PostsSyncRunInput): Promise<IngestEventRecord> {
+export async function createPostsSyncRun(
+  db: DbOrTx,
+  input: PostsSyncRunInput,
+): Promise<IngestEventRecord> {
   return withTransaction(db, async (trx) => {
     const event = await createIngestEvent(trx, input.ingestKind);
 
@@ -233,7 +236,7 @@ export async function updateFollowersSyncRun(
     .where("ingest_event_id", "=", ingestEventId)
     .executeTakeFirst();
 
-  return Number(result.numUpdatedRows ?? 0n);
+  return Number(result.numUpdatedRows);
 }
 
 export async function updateFollowingsSyncRun(
@@ -250,7 +253,7 @@ export async function updateFollowingsSyncRun(
     .where("ingest_event_id", "=", ingestEventId)
     .executeTakeFirst();
 
-  return Number(result.numUpdatedRows ?? 0n);
+  return Number(result.numUpdatedRows);
 }
 
 export async function updatePostsSyncRun(
@@ -268,7 +271,7 @@ export async function updatePostsSyncRun(
     .where("ingest_event_id", "=", ingestEventId)
     .executeTakeFirst();
 
-  return Number(result.numUpdatedRows ?? 0n);
+  return Number(result.numUpdatedRows);
 }
 
 export async function getLatestFollowersSyncRun(

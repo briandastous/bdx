@@ -12,7 +12,11 @@ export type AssetParamsInput =
       stableKey: string;
     }
   | {
-      assetSlug: "segment_followers" | "segment_followed" | "segment_mutuals" | "segment_unreciprocated_followed";
+      assetSlug:
+        | "segment_followers"
+        | "segment_followed"
+        | "segment_mutuals"
+        | "segment_unreciprocated_followed";
       paramsHash: string;
       paramsHashVersion: number;
       fanoutSourceParamsHash?: string | null;
@@ -37,13 +41,21 @@ type BaseAssetParamsRecord = {
   fanoutSourceParamsHashVersion: number | null;
 };
 
+function assertNever(value: never, message: string): never {
+  throw new Error(message);
+}
+
 export type AssetParamsRecord =
   | (BaseAssetParamsRecord & {
       assetSlug: "segment_specified_users";
       stableKey: string;
     })
   | (BaseAssetParamsRecord & {
-      assetSlug: "segment_followers" | "segment_followed" | "segment_mutuals" | "segment_unreciprocated_followed";
+      assetSlug:
+        | "segment_followers"
+        | "segment_followed"
+        | "segment_mutuals"
+        | "segment_unreciprocated_followed";
       subjectExternalId: bigint;
     })
   | (BaseAssetParamsRecord & {
@@ -133,7 +145,9 @@ async function fetchSegmentSpecifiedUsersParams(
     .executeTakeFirst();
 
   if (!row) {
-    throw new Error(`Missing segment_specified_users_params for asset_params_id=${base.id.toString()}`);
+    throw new Error(
+      `Missing segment_specified_users_params for asset_params_id=${base.id.toString()}`,
+    );
   }
 
   return {
@@ -147,9 +161,7 @@ async function fetchSubjectSegmentParams(
   db: DbOrTx,
   base: BaseAssetParamsRecord,
 ): Promise<AssetParamsRecord> {
-  let row:
-    | { subject_external_id: bigint }
-    | undefined;
+  let row: { subject_external_id: bigint } | undefined;
 
   switch (base.assetSlug) {
     case "segment_followers":
@@ -206,7 +218,9 @@ async function fetchPostCorpusParams(
     .executeTakeFirst();
 
   if (!row) {
-    throw new Error(`Missing post_corpus_for_segment_params for asset_params_id=${base.id.toString()}`);
+    throw new Error(
+      `Missing post_corpus_for_segment_params for asset_params_id=${base.id.toString()}`,
+    );
   }
 
   return {
@@ -234,7 +248,10 @@ export async function getAssetParamsById(
     case "post_corpus_for_segment":
       return fetchPostCorpusParams(db, base);
     default:
-      throw new Error(`Unknown asset slug '${base.assetSlug}' for asset_params_id=${base.id.toString()}`);
+      return assertNever(
+        base.assetSlug,
+        `Unknown asset slug '${String(base.assetSlug)}' for asset_params_id=${base.id.toString()}`,
+      );
   }
 }
 

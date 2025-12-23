@@ -1,9 +1,6 @@
 import { Buffer } from "node:buffer";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import {
-  type StartedPostgreSqlContainer,
-  PostgreSqlContainer,
-} from "@testcontainers/postgresql";
+import { type StartedPostgreSqlContainer, PostgreSqlContainer } from "@testcontainers/postgresql";
 import {
   addPostsSyncRunTargetUsers,
   acquireAdvisoryLock,
@@ -58,19 +55,23 @@ function captureStdout() {
   const chunks: string[] = [];
   const write = vi
     .spyOn(process.stdout, "write")
-    .mockImplementation((chunk: string | Uint8Array, _encoding?: unknown, cb?: (err?: Error) => void) => {
-      if (typeof chunk === "string") {
-        chunks.push(chunk);
-      } else {
-        chunks.push(Buffer.from(chunk).toString("utf8"));
-      }
-      if (typeof cb === "function") cb();
-      return true;
-    });
+    .mockImplementation(
+      (chunk: string | Uint8Array, _encoding?: unknown, cb?: (err?: Error) => void) => {
+        if (typeof chunk === "string") {
+          chunks.push(chunk);
+        } else {
+          chunks.push(Buffer.from(chunk).toString("utf8"));
+        }
+        if (typeof cb === "function") cb();
+        return true;
+      },
+    );
 
   return {
     read: () => chunks.join(""),
-    restore: () => write.mockRestore(),
+    restore: () => {
+      write.mockRestore();
+    },
   };
 }
 
@@ -122,7 +123,10 @@ describe("AssetEngine materialization", () => {
     await enableAssetInstanceRoot(db, instance.id);
 
     const logger = createLogger({ env: "test", level: "silent", service: "engine-test" });
-    const twitterClient = new TwitterApiClient({ token: "test-token", baseUrl: "http://localhost" });
+    const twitterClient = new TwitterApiClient({
+      token: "test-token",
+      baseUrl: "http://localhost",
+    });
     const engine = new AssetEngine({
       db,
       logger,
@@ -158,7 +162,9 @@ describe("AssetEngine materialization", () => {
       .select(["current_membership_materialization_id"])
       .where("id", "=", instance.id)
       .executeTakeFirst();
-    expect(firstPointer?.current_membership_materialization_id).toBe(firstMaterialization?.id ?? null);
+    expect(firstPointer?.current_membership_materialization_id).toBe(
+      firstMaterialization?.id ?? null,
+    );
 
     await replaceSpecifiedUsersInputs(db, {
       instanceId: instance.id,
@@ -193,7 +199,9 @@ describe("AssetEngine materialization", () => {
       .select(["current_membership_materialization_id"])
       .where("id", "=", instance.id)
       .executeTakeFirst();
-    expect(secondPointer?.current_membership_materialization_id).toBe(secondMaterialization?.id ?? null);
+    expect(secondPointer?.current_membership_materialization_id).toBe(
+      secondMaterialization?.id ?? null,
+    );
   });
 
   it("emits structured logs with materialization IDs", async () => {
@@ -295,7 +303,10 @@ describe("AssetEngine materialization", () => {
     });
 
     const logger = createLogger({ env: "test", level: "silent", service: "engine-test" });
-    const twitterClient = new TwitterApiClient({ token: "test-token", baseUrl: "http://localhost" });
+    const twitterClient = new TwitterApiClient({
+      token: "test-token",
+      baseUrl: "http://localhost",
+    });
     const engine = new AssetEngine({
       db,
       logger,
@@ -376,7 +387,10 @@ describe("AssetEngine materialization", () => {
     await enableAssetInstanceRoot(db, segmentInstance.id);
 
     const logger = createLogger({ env: "test", level: "silent", service: "engine-test" });
-    const twitterClient = new TwitterApiClient({ token: "test-token", baseUrl: "http://localhost" });
+    const twitterClient = new TwitterApiClient({
+      token: "test-token",
+      baseUrl: "http://localhost",
+    });
     const engine = new AssetEngine({
       db,
       logger,
@@ -421,7 +435,10 @@ describe("AssetEngine materialization", () => {
 
   it("records planner decisions when instances are missing", async () => {
     const logger = createLogger({ env: "test", level: "silent", service: "engine-test" });
-    const twitterClient = new TwitterApiClient({ token: "test-token", baseUrl: "http://localhost" });
+    const twitterClient = new TwitterApiClient({
+      token: "test-token",
+      baseUrl: "http://localhost",
+    });
     const engine = new AssetEngine({
       db,
       logger,
@@ -430,7 +447,9 @@ describe("AssetEngine materialization", () => {
     });
 
     const missingInstanceId = 999999n;
-    const outcome = await engine.materializeInstanceById(missingInstanceId, { triggerReason: "test" });
+    const outcome = await engine.materializeInstanceById(missingInstanceId, {
+      triggerReason: "test",
+    });
 
     expect(outcome.instanceId).toBe(missingInstanceId);
     expect(outcome.materializationId).toBeNull();
@@ -471,11 +490,15 @@ describe("AssetEngine materialization", () => {
     const lockDb = createDb(container.getConnectionUri());
     let releaseLock: (() => void) | undefined;
     const holdLock = new Promise<void>((resolve) => {
-      releaseLock = () => resolve();
+      releaseLock = () => {
+        resolve();
+      };
     });
     let lockReady: (() => void) | undefined;
     const lockReadyPromise = new Promise<void>((resolve) => {
-      lockReady = () => resolve();
+      lockReady = () => {
+        resolve();
+      };
     });
 
     const lockTask = lockDb.transaction().execute(async (trx) => {
@@ -489,7 +512,10 @@ describe("AssetEngine materialization", () => {
     await lockReadyPromise;
 
     const logger = createLogger({ env: "test", level: "silent", service: "engine-test" });
-    const twitterClient = new TwitterApiClient({ token: "test-token", baseUrl: "http://localhost" });
+    const twitterClient = new TwitterApiClient({
+      token: "test-token",
+      baseUrl: "http://localhost",
+    });
     const engine = new AssetEngine({
       db,
       logger,
@@ -498,7 +524,9 @@ describe("AssetEngine materialization", () => {
       lockTimeoutMs: 50,
     });
 
-    const outcome = await engine.materializeInstanceById(instance.id, { triggerReason: "lock-test" });
+    const outcome = await engine.materializeInstanceById(instance.id, {
+      triggerReason: "lock-test",
+    });
     expect(outcome.status).toBe("error");
     expect(outcome.materializationId).toBeNull();
 
@@ -537,21 +565,31 @@ describe("AssetEngine materialization", () => {
       token: "test-token",
       baseUrl: "https://example.test",
       minIntervalMs: 0,
-      fetch: async (input) => {
-        const url = new URL(typeof input === "string" ? input : input.toString());
+      fetch: (input) => {
+        const requestUrl =
+          typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        const url = new URL(requestUrl);
         if (url.pathname === "/twitter/user/batch_info_by_ids") {
-          return new Response(
-            JSON.stringify({ users: [{ id: targetUserId.toString(), userName: "target", name: "Target" }] }),
-            { status: 200 },
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                users: [{ id: targetUserId.toString(), userName: "target", name: "Target" }],
+              }),
+              { status: 200 },
+            ),
           );
         }
         if (url.pathname === "/twitter/user/followers") {
-          return new Response(
-            JSON.stringify({ followers: [{ id: "100", userName: "follower", name: "Follower" }] }),
-            { status: 200 },
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                followers: [{ id: "100", userName: "follower", name: "Follower" }],
+              }),
+              { status: 200 },
+            ),
           );
         }
-        return new Response("{}", { status: 200 });
+        return Promise.resolve(new Response("{}", { status: 200 }));
       },
     });
 
@@ -588,21 +626,31 @@ describe("AssetEngine materialization", () => {
       token: "test-token",
       baseUrl: "https://example.test",
       minIntervalMs: 0,
-      fetch: async (input) => {
-        const url = new URL(typeof input === "string" ? input : input.toString());
+      fetch: (input) => {
+        const requestUrl =
+          typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        const url = new URL(requestUrl);
         if (url.pathname === "/twitter/user/batch_info_by_ids") {
-          return new Response(
-            JSON.stringify({ users: [{ id: subjectUserId.toString(), userName: "subject", name: "Subject" }] }),
-            { status: 200 },
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                users: [{ id: subjectUserId.toString(), userName: "subject", name: "Subject" }],
+              }),
+              { status: 200 },
+            ),
           );
         }
         if (url.pathname === "/twitter/user/followers") {
-          return new Response(JSON.stringify({ followers: [], next_cursor: null }), { status: 200 });
+          return Promise.resolve(
+            new Response(JSON.stringify({ followers: [], next_cursor: null }), { status: 200 }),
+          );
         }
         if (url.pathname === "/twitter/user/followings") {
-          return new Response(JSON.stringify({ followings: [], next_cursor: null }), { status: 200 });
+          return Promise.resolve(
+            new Response(JSON.stringify({ followings: [], next_cursor: null }), { status: 200 }),
+          );
         }
-        return new Response("{}", { status: 200 });
+        return Promise.resolve(new Response("{}", { status: 200 }));
       },
     });
 
@@ -644,17 +692,25 @@ describe("AssetEngine materialization", () => {
     const lockDb = createDb(container.getConnectionUri());
     let releaseLock: (() => void) | undefined;
     const holdLock = new Promise<void>((resolve) => {
-      releaseLock = () => resolve();
+      releaseLock = () => {
+        resolve();
+      };
     });
     let lockReady: (() => void) | undefined;
     const lockReadyPromise = new Promise<void>((resolve) => {
-      lockReady = () => resolve();
+      lockReady = () => {
+        resolve();
+      };
     });
 
     const lockTask = lockDb.connection().execute(async (conn) => {
-      const acquired = await acquireAdvisoryLock(conn, `ingest:followers:${targetUserId.toString()}`, {
-        timeoutMs: 1000,
-      });
+      const acquired = await acquireAdvisoryLock(
+        conn,
+        `ingest:followers:${targetUserId.toString()}`,
+        {
+          timeoutMs: 1000,
+        },
+      );
       expect(acquired).toBe(true);
       lockReady?.();
       await holdLock;
@@ -667,18 +723,26 @@ describe("AssetEngine materialization", () => {
       token: "test-token",
       baseUrl: "https://example.test",
       minIntervalMs: 0,
-      fetch: async (input) => {
-        const url = new URL(typeof input === "string" ? input : input.toString());
+      fetch: (input) => {
+        const requestUrl =
+          typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        const url = new URL(requestUrl);
         if (url.pathname === "/twitter/user/batch_info_by_ids") {
-          return new Response(
-            JSON.stringify({ users: [{ id: targetUserId.toString(), userName: "target", name: "Target" }] }),
-            { status: 200 },
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                users: [{ id: targetUserId.toString(), userName: "target", name: "Target" }],
+              }),
+              { status: 200 },
+            ),
           );
         }
         if (url.pathname === "/twitter/user/followers") {
-          return new Response(JSON.stringify({ followers: [], next_cursor: null }), { status: 200 });
+          return Promise.resolve(
+            new Response(JSON.stringify({ followers: [], next_cursor: null }), { status: 200 }),
+          );
         }
-        return new Response("{}", { status: 200 });
+        return Promise.resolve(new Response("{}", { status: 200 }));
       },
     });
 
@@ -716,7 +780,10 @@ describe("AssetEngine materialization", () => {
 
   it("records validation warnings for empty specified-user inputs", async () => {
     const logger = createLogger({ env: "test", level: "silent", service: "engine-test" });
-    const twitterClient = new TwitterApiClient({ token: "test-token", baseUrl: "http://localhost" });
+    const twitterClient = new TwitterApiClient({
+      token: "test-token",
+      baseUrl: "http://localhost",
+    });
     const engine = new AssetEngine({
       db,
       logger,

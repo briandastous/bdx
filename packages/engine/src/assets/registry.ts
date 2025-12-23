@@ -9,7 +9,13 @@ import {
 import type { AssetSlug } from "@bdx/db";
 import type { AssetParams, SegmentParams, SubjectSegmentParams } from "./params.js";
 import { paramsHashV1 } from "./params.js";
-import type { AssetItemKind, DependencySpec, IngestRequirement, ResolvedDependency } from "./types.js";
+import type {
+  AssetItemKind,
+  Awaitable,
+  DependencySpec,
+  IngestRequirement,
+  ResolvedDependency,
+} from "./types.js";
 
 export interface AssetValidationIssue {
   code: string;
@@ -26,8 +32,11 @@ export interface AssetDefinition {
     params: AssetParams,
     deps: ResolvedDependency[],
     context: { db: DbOrTx },
-  ): Promise<IngestRequirement[]>;
-  inputsHashParts(params: AssetParams, context: { db: DbOrTx; instanceId: bigint }): Promise<string[]>;
+  ): Awaitable<IngestRequirement[]>;
+  inputsHashParts(
+    params: AssetParams,
+    context: { db: DbOrTx; instanceId: bigint },
+  ): Awaitable<string[]>;
   computeMembership(
     params: AssetParams,
     deps: ResolvedDependency[],
@@ -36,7 +45,7 @@ export interface AssetDefinition {
   validateInputs?(
     params: AssetParams,
     context: { db: DbOrTx; instanceId: bigint },
-  ): Promise<AssetValidationIssue[]>;
+  ): Awaitable<AssetValidationIssue[]>;
   paramsHash(params: AssetParams): string;
   paramsFromFanoutItem?(
     itemKind: AssetItemKind,
@@ -75,7 +84,7 @@ const specifiedUsers: AssetDefinition = {
   slug: "segment_specified_users",
   outputItemKind: "user",
   dependencies: () => [],
-  ingestRequirements: async () => [],
+  ingestRequirements: () => [],
   inputsHashParts: async (_params, context) => {
     const ids = await listSpecifiedUsersInputs(context.db, context.instanceId);
     return ids.map((id) => `user_external_id=${id.toString()}`);
@@ -105,20 +114,20 @@ const followers: AssetDefinition = {
   outputItemKind: "user",
   subjectItemKind: "user",
   dependencies: () => [],
-  ingestRequirements: async (params) => {
+  ingestRequirements: (params) => {
     const typed = expectSegmentParams(params, "segment_followers");
     if (typed.assetSlug !== "segment_followers") {
       throw new Error("Unexpected params for followers segment");
     }
-    return [
+    return Promise.resolve([
       {
         ingestKind: "twitterio_api_user_followers",
         targetUserId: typed.subjectExternalId,
         freshnessMs: SIX_HOURS_MS,
       },
-    ];
+    ]);
   },
-  inputsHashParts: async () => [],
+  inputsHashParts: () => [],
   computeMembership: async (params, _deps, context) => {
     const typed = expectSegmentParams(params, "segment_followers");
     if (typed.assetSlug !== "segment_followers") {
@@ -139,20 +148,20 @@ const followed: AssetDefinition = {
   outputItemKind: "user",
   subjectItemKind: "user",
   dependencies: () => [],
-  ingestRequirements: async (params) => {
+  ingestRequirements: (params) => {
     const typed = expectSegmentParams(params, "segment_followed");
     if (typed.assetSlug !== "segment_followed") {
       throw new Error("Unexpected params for followed segment");
     }
-    return [
+    return Promise.resolve([
       {
         ingestKind: "twitterio_api_user_followings",
         targetUserId: typed.subjectExternalId,
         freshnessMs: SIX_HOURS_MS,
       },
-    ];
+    ]);
   },
-  inputsHashParts: async () => [],
+  inputsHashParts: () => [],
   computeMembership: async (params, _deps, context) => {
     const typed = expectSegmentParams(params, "segment_followed");
     if (typed.assetSlug !== "segment_followed") {
@@ -198,8 +207,8 @@ const mutuals: AssetDefinition = {
       },
     ];
   },
-  ingestRequirements: async () => [],
-  inputsHashParts: async () => [],
+  ingestRequirements: () => [],
+  inputsHashParts: () => [],
   computeMembership: async (_params, deps, context) => {
     const followersDep = deps.find((dep) => dep.name === "followers");
     const followedDep = deps.find((dep) => dep.name === "followed");
@@ -255,8 +264,8 @@ const unreciprocated: AssetDefinition = {
       },
     ];
   },
-  ingestRequirements: async () => [],
-  inputsHashParts: async () => [],
+  ingestRequirements: () => [],
+  inputsHashParts: () => [],
   computeMembership: async (_params, deps, context) => {
     const followedDep = deps.find((dep) => dep.name === "followed");
     const followersDep = deps.find((dep) => dep.name === "followers");
@@ -320,7 +329,7 @@ const postCorpus: AssetDefinition = {
       requestedByMaterializationIds: [source.materializationId],
     }));
   },
-  inputsHashParts: async () => [],
+  inputsHashParts: () => [],
   computeMembership: async (_params, deps, context) => {
     const source = deps.find((dep) => dep.name === "source_segment");
     if (!source) {
@@ -347,11 +356,7 @@ const registry: Record<AssetSlug, AssetDefinition> = {
 };
 
 export function getAssetDefinition(slug: AssetSlug): AssetDefinition {
-  const definition = registry[slug];
-  if (!definition) {
-    throw new Error(`Unknown asset slug: ${slug}`);
-  }
-  return definition;
+  return registry[slug];
 }
 
 export function listAssetDefinitions(): AssetDefinition[] {

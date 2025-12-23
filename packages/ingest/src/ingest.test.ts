@@ -1,16 +1,7 @@
 import { Buffer } from "node:buffer";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  type StartedPostgreSqlContainer,
-  PostgreSqlContainer,
-} from "@testcontainers/postgresql";
-import {
-  createDb,
-  destroyDb,
-  migrateToLatest,
-  upsertFollows,
-  type Db,
-} from "@bdx/db";
+import { type StartedPostgreSqlContainer, PostgreSqlContainer } from "@testcontainers/postgresql";
+import { createDb, destroyDb, migrateToLatest, upsertFollows, type Db } from "@bdx/db";
 import { createLogger } from "@bdx/observability";
 import { TwitterApiClient, type JsonValue } from "@bdx/twitterapi-io";
 import { FollowersSyncService } from "./followers.js";
@@ -25,8 +16,10 @@ type FixtureResponse = {
 
 function createFixtureFetch(responses: FixtureResponse[]): typeof fetch {
   const queue = [...responses];
-  return async (input) => {
-    const url = new URL(typeof input === "string" ? input : input.toString());
+  return (input) => {
+    const requestUrl =
+      typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    const url = new URL(requestUrl);
     const next = queue.shift();
     if (!next) {
       throw new Error(`No fixture response remaining for ${url.pathname}`);
@@ -34,10 +27,12 @@ function createFixtureFetch(responses: FixtureResponse[]): typeof fetch {
     if (next.path !== url.pathname) {
       throw new Error(`Expected fixture for ${next.path}, got ${url.pathname}`);
     }
-    return new Response(JSON.stringify(next.body), {
-      status: next.status ?? 200,
-      headers: { "content-type": "application/json" },
-    });
+    return Promise.resolve(
+      new Response(JSON.stringify(next.body), {
+        status: next.status ?? 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
   };
 }
 
@@ -97,19 +92,23 @@ function captureStdout() {
   const chunks: string[] = [];
   const write = vi
     .spyOn(process.stdout, "write")
-    .mockImplementation((chunk: string | Uint8Array, _encoding?: unknown, cb?: (err?: Error) => void) => {
-      if (typeof chunk === "string") {
-        chunks.push(chunk);
-      } else {
-        chunks.push(Buffer.from(chunk).toString("utf8"));
-      }
-      if (typeof cb === "function") cb();
-      return true;
-    });
+    .mockImplementation(
+      (chunk: string | Uint8Array, _encoding?: unknown, cb?: (err?: Error) => void) => {
+        if (typeof chunk === "string") {
+          chunks.push(chunk);
+        } else {
+          chunks.push(Buffer.from(chunk).toString("utf8"));
+        }
+        if (typeof cb === "function") cb();
+        return true;
+      },
+    );
 
   return {
     read: () => chunks.join(""),
-    restore: () => write.mockRestore(),
+    restore: () => {
+      write.mockRestore();
+    },
   };
 }
 
@@ -174,7 +173,13 @@ describe("ingest services", () => {
 
     const run = await db
       .selectFrom("followers_sync_runs")
-      .select(["status", "cursor_exhausted", "last_api_status", "last_http_request", "last_http_response"])
+      .select([
+        "status",
+        "cursor_exhausted",
+        "last_api_status",
+        "last_http_request",
+        "last_http_response",
+      ])
       .where("ingest_event_id", "=", result.syncRunId)
       .executeTakeFirstOrThrow();
 
@@ -390,7 +395,13 @@ describe("ingest services", () => {
 
     const run = await db
       .selectFrom("posts_sync_runs")
-      .select(["status", "cursor_exhausted", "last_api_status", "last_http_request", "last_http_response"])
+      .select([
+        "status",
+        "cursor_exhausted",
+        "last_api_status",
+        "last_http_request",
+        "last_http_response",
+      ])
       .where("ingest_event_id", "=", result.syncRunId)
       .executeTakeFirstOrThrow();
 

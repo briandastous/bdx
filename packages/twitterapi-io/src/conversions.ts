@@ -42,7 +42,7 @@ function toBigInt(value: unknown): bigint | null {
 
 function toStringArray(value: unknown): string[] | null {
   if (!Array.isArray(value)) return null;
-  const filtered = value.filter((item) => typeof item === "string") as string[];
+  const filtered = value.filter((item): item is string => typeof item === "string");
   return filtered.length > 0 ? filtered : [];
 }
 

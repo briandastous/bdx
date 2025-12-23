@@ -27,7 +27,9 @@ export async function runEngineLoop(params: {
     try {
       await delay(sleepMs, undefined, { signal: params.signal });
     } catch (error) {
-      if (params.signal.aborted) return;
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
       throw error;
     }
   }

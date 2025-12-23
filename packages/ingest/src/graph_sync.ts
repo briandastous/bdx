@@ -172,7 +172,10 @@ export abstract class BaseGraphSyncService<PageT extends GraphSyncPage> {
     primaryUserId: bigint,
   ): string;
 
-  protected lastHttpExchange(): { request: RequestSnapshot | null; response: ResponseSnapshot | null } {
+  protected lastHttpExchange(): {
+    request: RequestSnapshot | null;
+    response: ResponseSnapshot | null;
+  } {
     return this.client.lastExchange();
   }
 
@@ -243,7 +246,7 @@ export abstract class BaseGraphSyncService<PageT extends GraphSyncPage> {
         });
       }
 
-      while (true) {
+      for (;;) {
         const previousCursor: string | null = cursor;
         this.logger.debug(
           {

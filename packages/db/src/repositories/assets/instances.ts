@@ -119,5 +119,5 @@ export async function updateCurrentMembershipMaterialization(
     .where("id", "=", params.instanceId)
     .executeTakeFirst();
 
-  return Number(result.numUpdatedRows ?? 0n);
+  return Number(result.numUpdatedRows);
 }

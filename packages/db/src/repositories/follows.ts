@@ -35,9 +35,7 @@ export async function upsertFollows(db: DbOrTx, rows: FollowEdgeInput[]): Promis
   const result = await db
     .insertInto("follows")
     .values(values)
-    .onConflict((oc) =>
-      oc.columns(["target_id", "follower_id"]).doUpdateSet({ is_deleted: false }),
-    )
+    .onConflict((oc) => oc.columns(["target_id", "follower_id"]).doUpdateSet({ is_deleted: false }))
     .executeTakeFirst();
 
   return Number(result.numInsertedOrUpdatedRows ?? 0n);
@@ -113,7 +111,7 @@ export async function markFollowersSoftDeleted(
     .where("follower_id", "in", removals)
     .executeTakeFirst();
 
-  return Number(result.numUpdatedRows ?? 0n);
+  return Number(result.numUpdatedRows);
 }
 
 export async function markFollowingsSoftDeleted(
@@ -133,5 +131,5 @@ export async function markFollowingsSoftDeleted(
     .where("target_id", "in", removals)
     .executeTakeFirst();
 
-  return Number(result.numUpdatedRows ?? 0n);
+  return Number(result.numUpdatedRows);
 }

@@ -38,7 +38,7 @@ export async function acquireAdvisoryLock(
   const pollIntervalMs = options.pollIntervalMs ?? 250;
   const start = Date.now();
 
-  while (true) {
+  for (;;) {
     if (await tryAdvisoryLock(db, key)) return true;
     if (timeoutMs <= 0) return false;
 

@@ -1,8 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import {
-  type StartedPostgreSqlContainer,
-  PostgreSqlContainer,
-} from "@testcontainers/postgresql";
+import { type StartedPostgreSqlContainer, PostgreSqlContainer } from "@testcontainers/postgresql";
 import { createDb, destroyDb, migrateToLatest, type Db } from "@bdx/db";
 import { createPinoOptions } from "@bdx/observability";
 import { TwitterApiClient, type XUserData } from "@bdx/twitterapi-io";
@@ -13,8 +10,33 @@ class StubTwitterApiClient extends TwitterApiClient {
     super({ token: "test-token", baseUrl: "http://localhost" });
   }
 
-  override async fetchUserProfileByHandle(_handle: string): Promise<XUserData | null> {
-    return this.profile;
+  override fetchUserProfileByHandle(_handle: string): Promise<XUserData | null> {
+    return Promise.resolve(this.profile);
+  }
+}
+
+function assertWebhookBody(
+  value: unknown,
+): asserts value is { follower_user_id: string; target_user_id: string } {
+  if (!value || typeof value !== "object") {
+    throw new Error("Unexpected webhook response body");
+  }
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record["follower_user_id"] !== "string" ||
+    typeof record["target_user_id"] !== "string"
+  ) {
+    throw new Error("Unexpected webhook response body");
+  }
+}
+
+function assertOpenapiDoc(value: unknown): asserts value is { paths: Record<string, unknown> } {
+  if (!value || typeof value !== "object") {
+    throw new Error("Unexpected OpenAPI response body");
+  }
+  const record = value as Record<string, unknown>;
+  if (!record["paths"] || typeof record["paths"] !== "object") {
+    throw new Error("Unexpected OpenAPI response body");
   }
 }
 
@@ -122,7 +144,8 @@ describe("webhook ingestion", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    const body = response.json();
+    const body = response.json<unknown>();
+    assertWebhookBody(body);
     expect(body.follower_user_id).toBe("777");
     expect(body.target_user_id).toBe("555");
 
@@ -133,9 +156,7 @@ describe("webhook ingestion", () => {
       .selectFrom("follows")
       .select(["target_id", "follower_id", "is_deleted"])
       .execute();
-    expect(followRows).toEqual([
-      { target_id: 555n, follower_id: 777n, is_deleted: false },
-    ]);
+    expect(followRows).toEqual([{ target_id: 555n, follower_id: 777n, is_deleted: false }]);
 
     await server.close();
   });
@@ -146,7 +167,8 @@ describe("webhook ingestion", () => {
 
     const response = await server.inject({ method: "GET", url: "/openapi.json" });
     expect(response.statusCode).toBe(200);
-    const body = response.json();
+    const body = response.json<unknown>();
+    assertOpenapiDoc(body);
     expect(body.paths).toHaveProperty("/webhooks/ifttt/new-x-follower");
 
     await server.close();
