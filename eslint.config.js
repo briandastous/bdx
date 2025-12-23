@@ -48,6 +48,8 @@ export default tseslint.config(
           allowNumber: true,
         },
       ],
+      eqeqeq: ["error", "always", { null: "ignore" }],
+      "no-eq-null": "off",
     },
   },
   {
