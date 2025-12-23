@@ -7,6 +7,7 @@ This repo is a planned rewrite of the legacy Python+Gel system (local reference:
   - `docs/runbooks/migrations.md`
   - `docs/runbooks/kysely.md`
   - `docs/runbooks/api.md`
+  - `docs/runbooks/local-dev.md`
   - `docs/runbooks/deploy-railway.md`
 
 ## Local development
@@ -24,10 +25,13 @@ This repo is a planned rewrite of the legacy Python+Gel system (local reference:
 2. Configure secrets + `DEPLOY_ENV`:
    - `cp .env.example .env.local`
    - Edit `.env.local` with your editor (e.g. `code .env.local` / `vim .env.local`).
+   - Ensure `TWITTERAPI_IO_TOKEN`, `X_SELF_USER_ID`, and `X_SELF_HANDLE` are set (or set the X self values in YAML).
 3. Configure non-secret settings (optional):
    - Edit `config/base.yaml` and/or `config/env/development.yaml`.
 4. Start Postgres:
-   - `docker compose up -d db`
+   - `pnpm db:up`
+   - If port 5432 is already in use, set `DB_PORT` and update `DATABASE_URL` accordingly
+     (e.g. `DB_PORT=5433`, `DATABASE_URL=postgres://bdx:bdx@localhost:5433/bdx`).
 5. Run migrations:
    - `(set -a; source .env.local; set +a; pnpm db:migrate)`
 6. Run API + worker:
@@ -42,3 +46,14 @@ Notes:
 - `pnpm lint`
 - `pnpm typecheck`
 - `pnpm test`
+
+## CLI quick reference
+
+- Asset roots:
+  - `bdx assets:roots:enable`
+  - `bdx assets:roots:disable`
+- Fanout roots:
+  - `bdx assets:fanout-roots:enable`
+  - `bdx assets:fanout-roots:disable`
+- Worker tick:
+  - `bdx worker:tick`

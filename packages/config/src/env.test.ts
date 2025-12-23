@@ -7,6 +7,7 @@ describe("loadWorkerEnv", () => {
       NODE_ENV: "test",
       LOG_LEVEL: "info",
       DATABASE_URL: "postgres://example",
+      TWITTERAPI_IO_TOKEN: "test-token",
     });
 
     expect(env.DEPLOY_ENV).toBe("development");
@@ -19,6 +20,7 @@ describe("loadWorkerEnv", () => {
       LOG_LEVEL: "info",
       DATABASE_URL: "postgres://example",
       RUN_MIGRATIONS: "false",
+      TWITTERAPI_IO_TOKEN: "test-token",
     });
 
     expect(env.RUN_MIGRATIONS).toBe(false);
@@ -29,6 +31,7 @@ describe("loadWorkerEnv", () => {
       NODE_ENV: "production",
       LOG_LEVEL: "info",
       DATABASE_URL: "postgres://example",
+      TWITTERAPI_IO_TOKEN: "test-token",
     });
 
     expect(env.DEPLOY_ENV).toBe("production");

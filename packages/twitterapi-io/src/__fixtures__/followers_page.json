@@ -1,0 +1,12 @@
+{
+  "followers": [
+    {
+      "id": "101",
+      "userName": "alice",
+      "name": "Alice",
+      "followers": "10",
+      "following": "5"
+    }
+  ],
+  "next_cursor": "next"
+}

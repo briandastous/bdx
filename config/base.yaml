@@ -5,6 +5,13 @@
 
 logLevel: info
 
+db:
+  maxConnections: 10
+  idleTimeoutMs: 60000
+  connectTimeoutMs: 10000
+  maxLifetimeMs: 3600000
+  statementTimeoutMs: 30000
+
 api:
   host: 0.0.0.0
   port: 3000
@@ -12,4 +19,22 @@ api:
 worker:
   engineTickIntervalMs: 60000
   runMigrations: true
+  # healthPort: 3002
 
+retention:
+  enabled: true
+  periodMs: 86400000
+  plannerEventsDays: 30
+  ingestEventsDays: 90
+  webhookEventsDays: 180
+  httpBodyMaxBytes: 2048
+
+twitterapiIo:
+  baseUrl: https://api.twitterapi.io
+  rateLimitQps: 1
+  maxQueryLength: 512
+
+x:
+  self:
+    userId: 41174129
+    handle: "brianwut"

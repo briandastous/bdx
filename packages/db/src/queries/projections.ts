@@ -1,0 +1,45 @@
+export const userSummaryColumns = [
+  "users.id",
+  "users.handle",
+  "users.display_name",
+  "users.followers_count",
+  "users.following_count",
+] as const;
+
+export const userProfileColumns = [
+  "users.id",
+  "users.handle",
+  "users.display_name",
+  "users.profile_url",
+  "users.profile_image_url",
+  "users.cover_image_url",
+  "users.bio",
+  "users.location",
+  "users.is_blue_verified",
+  "users.verified_type",
+  "users.is_translator",
+  "users.is_automated",
+  "users.automated_by",
+  "users.possibly_sensitive",
+  "users.unavailable",
+  "users.unavailable_message",
+  "users.unavailable_reason",
+  "users.followers_count",
+  "users.following_count",
+  "users.favourites_count",
+  "users.media_count",
+  "users.statuses_count",
+  "users.user_created_at",
+  "users.bio_entities",
+  "users.affiliates_highlighted_label",
+  "users.pinned_tweet_ids",
+  "users.withheld_countries",
+] as const;
+
+export const postSummaryColumns = [
+  "posts.id",
+  "posts.author_id",
+  "posts.posted_at",
+  "posts.text",
+  "posts.lang",
+] as const;

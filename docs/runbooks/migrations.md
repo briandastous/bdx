@@ -38,6 +38,10 @@ Policy:
 
 ## Commands
 
+Start Postgres (validates `DB_PORT` vs `DATABASE_URL`):
+
+- `pnpm db:up`
+
 Run migrations once:
 
 - `(set -a; source .env.local; set +a; pnpm db:migrate)`
@@ -49,4 +53,3 @@ Auto-migrate on worker start:
 ## Baseline reset
 
 This is a new repo with a fresh Postgres database. Before Phase 2/3 schema work begins, we will rewrite `packages/db/src/migrations/0001_init.ts` to be the true foundation migration for the rewrite. After that, migrations are append-only and should not be edited.
-

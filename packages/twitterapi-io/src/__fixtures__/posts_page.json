@@ -1,0 +1,14 @@
+{
+  "tweets": [
+    {
+      "id": "500",
+      "text": "Hello world",
+      "createdAt": "2024-01-01T00:00:00Z",
+      "lang": "en",
+      "author": {
+        "id": "101"
+      }
+    }
+  ],
+  "next_cursor": null
+}

@@ -16,6 +16,14 @@ This repo pins the currently installed Kysely version as the source of truth.
 
 ## BDX conventions (repo-specific)
 
+### Type generation
+
+- Database types are generated from the live schema with `kysely-codegen`.
+  - Config: `.kysely-codegenrc.json`
+  - Output: `packages/db/src/database.ts`
+- `bigint` columns are mapped to TypeScript `bigint` via codegen (see `typeMapping` in the config).
+- JSON/JSONB columns are typed as `JsonValue`; treat them as `unknown` at boundaries and validate with Zod.
+
 ### DB access boundaries
 
 - Keep SQL usage in `packages/db`:
@@ -61,6 +69,9 @@ This repo pins the currently installed Kysely version as the source of truth.
   - shared projections (stable “select shapes”),
   - shared filters (soft-delete semantics, status predicates),
   - shared joins (common relationships expressed once).
+- Repo defaults live in:
+  - `packages/db/src/queries/` (filters + projections),
+  - `packages/db/src/repositories/` (domain-specific query helpers).
 
 ### Cursor pagination
 
@@ -68,6 +79,7 @@ This repo pins the currently installed Kysely version as the source of truth.
 - If using `kysely-cursor`:
   - treat cursor tokens as opaque and short-lived (token invalidation across deploys is acceptable),
   - avoid homegrown token encode/decode logic.
+  - use the shared helper in `packages/db/src/pagination.ts` (default codec: SuperJSON → Base64 URL).
 
 ## Vendored Kysely docs (comprehensive index)
 

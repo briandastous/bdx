@@ -24,7 +24,9 @@ This runbook captures the repo’s HTTP API conventions (Fastify).
 
 ## OpenAPI
 
-OpenAPI should be generated from runtime validation schemas (Zod-first) so the spec stays accurate and is consumable by AI agents and typed clients.
+OpenAPI is generated from runtime validation schemas (Zod-first) using
+`@asteasolutions/zod-to-openapi` so the spec stays accurate and is consumable by AI agents and typed
+clients.
 
-The exact Zod→OpenAPI integration will be selected and documented during Phase 10.
-
+- JSON document: `GET /openapi.json`
+- Keep Zod schemas as the source of truth; avoid hand-editing the OpenAPI output.

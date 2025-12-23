@@ -15,7 +15,9 @@
   },
   "dependencies": {
     "@bdx/db": "workspace:*",
-    "@bdx/observability": "workspace:*"
+    "@bdx/ingest": "workspace:*",
+    "@bdx/observability": "workspace:*",
+    "@bdx/twitterapi-io": "workspace:*",
+    "zod": "^3.24.1"
   }
 }
-

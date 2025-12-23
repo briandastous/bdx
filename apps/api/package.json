@@ -10,7 +10,10 @@
   "dependencies": {
     "@bdx/config": "workspace:*",
     "@bdx/db": "workspace:*",
+    "@bdx/ingest": "workspace:*",
     "@bdx/observability": "workspace:*",
+    "@bdx/twitterapi-io": "workspace:*",
+    "@asteasolutions/zod-to-openapi": "^7.3.4",
     "fastify": "^5.2.0",
     "zod": "^3.24.1"
   }

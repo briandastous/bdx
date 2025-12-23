@@ -9,7 +9,8 @@
   "references": [
     { "path": "../../packages/config" },
     { "path": "../../packages/db" },
-    { "path": "../../packages/observability" }
+    { "path": "../../packages/ingest" },
+    { "path": "../../packages/observability" },
+    { "path": "../../packages/twitterapi-io" }
   ]
 }
-

@@ -223,9 +223,10 @@ Rewrite expectation:
 
 ## Deferred / not ported (explicit)
 
-These legacy concerns should not exist in the rewrite v1 (checklist):
-- [ ] Prefect Cloud + deployment model (engine runner replaces it).
-- [ ] Gel/EdgeQL schema and codegen workflows.
-- [ ] `enable-env` secrets injection wrapper.
-- [ ] Letta app/server.
-- [ ] Hook execution machinery (e.g., `*ActionRun` flows/APIs); rebuild later only if needed.
+These legacy concerns should not exist in the rewrite v1. The checklist below is used to verify
+that each item was intentionally *not* ported:
+- [x] Prefect Cloud + deployment model (engine runner replaces it).
+- [x] Gel/EdgeQL schema and codegen workflows.
+- [x] `enable-env` secrets injection wrapper.
+- [x] Letta app/server.
+- [x] Hook execution machinery (e.g., `*ActionRun` flows/APIs); rebuild later only if needed.

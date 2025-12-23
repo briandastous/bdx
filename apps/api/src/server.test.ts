@@ -1,0 +1,154 @@
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  type StartedPostgreSqlContainer,
+  PostgreSqlContainer,
+} from "@testcontainers/postgresql";
+import { createDb, destroyDb, migrateToLatest, type Db } from "@bdx/db";
+import { createPinoOptions } from "@bdx/observability";
+import { TwitterApiClient, type XUserData } from "@bdx/twitterapi-io";
+import { buildServer } from "./server.js";
+
+class StubTwitterApiClient extends TwitterApiClient {
+  constructor(private readonly profile: XUserData | null) {
+    super({ token: "test-token", baseUrl: "http://localhost" });
+  }
+
+  override async fetchUserProfileByHandle(_handle: string): Promise<XUserData | null> {
+    return this.profile;
+  }
+}
+
+describe("webhook ingestion", () => {
+  let container: StartedPostgreSqlContainer;
+  let db: Db;
+
+  beforeAll(async () => {
+    container = await new PostgreSqlContainer("postgres:18")
+      .withDatabase("bdx_test")
+      .withUsername("bdx")
+      .withPassword("bdx")
+      .start();
+    db = createDb(container.getConnectionUri());
+    await migrateToLatest(db);
+  });
+
+  afterAll(async () => {
+    await destroyDb(db);
+    await container.stop();
+  });
+
+  function buildTestServer(profile: XUserData | null) {
+    return buildServer({
+      db,
+      loggerOptions: createPinoOptions({ env: "test", level: "silent", service: "api" }),
+      webhookToken: "secret",
+      twitterClient: new StubTwitterApiClient(profile),
+      xSelf: { userId: 555n, handle: "target" },
+    });
+  }
+
+  const followerProfile: XUserData = {
+    userId: 777n,
+    userName: "follower",
+    displayName: "Follower",
+    profileUrl: null,
+    profileImageUrl: null,
+    coverImageUrl: null,
+    bio: null,
+    location: null,
+    isBlueVerified: null,
+    verifiedType: null,
+    isTranslator: null,
+    isAutomated: null,
+    automatedBy: null,
+    possiblySensitive: null,
+    unavailable: null,
+    unavailableMessage: null,
+    unavailableReason: null,
+    followersCount: null,
+    followingCount: null,
+    favouritesCount: null,
+    mediaCount: null,
+    statusesCount: null,
+    createdAt: null,
+    bioEntities: null,
+    affiliatesHighlightedLabel: null,
+    pinnedTweetIds: null,
+    withheldCountries: null,
+  };
+
+  it("rejects missing webhook tokens", async () => {
+    const server = buildTestServer(followerProfile);
+    await server.ready();
+
+    const response = await server.inject({
+      method: "POST",
+      url: "/webhooks/ifttt/new-x-follower",
+      payload: {
+        LinkToProfile: "https://x.com/follower",
+      },
+    });
+
+    expect(response.statusCode).toBe(401);
+    await server.close();
+  });
+
+  it("rejects invalid webhook payloads", async () => {
+    const server = buildTestServer(followerProfile);
+    await server.ready();
+
+    const response = await server.inject({
+      method: "POST",
+      url: "/webhooks/ifttt/new-x-follower?token=secret",
+      payload: {
+        Missing: "LinkToProfile",
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    await server.close();
+  });
+
+  it("accepts a webhook and persists the follower relationship", async () => {
+    const server = buildTestServer(followerProfile);
+    await server.ready();
+
+    const response = await server.inject({
+      method: "POST",
+      url: "/webhooks/ifttt/new-x-follower?token=secret",
+      payload: {
+        LinkToProfile: "https://x.com/follower",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.follower_user_id).toBe("777");
+    expect(body.target_user_id).toBe("555");
+
+    const webhookRows = await db.selectFrom("webhook_follow_events").selectAll().execute();
+    expect(webhookRows).toHaveLength(1);
+
+    const followRows = await db
+      .selectFrom("follows")
+      .select(["target_id", "follower_id", "is_deleted"])
+      .execute();
+    expect(followRows).toEqual([
+      { target_id: 555n, follower_id: 777n, is_deleted: false },
+    ]);
+
+    await server.close();
+  });
+
+  it("serves OpenAPI JSON", async () => {
+    const server = buildTestServer(followerProfile);
+    await server.ready();
+
+    const response = await server.inject({ method: "GET", url: "/openapi.json" });
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.paths).toHaveProperty("/webhooks/ifttt/new-x-follower");
+
+    await server.close();
+  });
+});

@@ -15,8 +15,8 @@
   },
   "dependencies": {
     "kysely": "^0.28.7",
+    "kysely-cursor": "^0.1.0",
     "kysely-postgres-js": "^2.0.0",
     "postgres": "^3.4.5"
   }
 }
-

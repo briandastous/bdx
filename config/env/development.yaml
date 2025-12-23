@@ -1,3 +1,11 @@
 # Development overrides (non-secret).
-{}
 
+logLevel: info
+
+api:
+  host: 0.0.0.0
+  port: 3000
+
+worker:
+  engineTickIntervalMs: 60000
+  runMigrations: true

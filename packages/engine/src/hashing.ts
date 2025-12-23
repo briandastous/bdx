@@ -7,6 +7,16 @@ export function sha256Hex(input: string): string {
   return createHash("sha256").update(input).digest("hex");
 }
 
+export function hashPartsV1(parts: readonly string[]): { version: HashVersion; hash: string } {
+  const hasher = createHash("sha256");
+  hasher.update("v1\0");
+  for (const part of parts) {
+    hasher.update(part);
+    hasher.update("\0");
+  }
+  return { version: HASH_VERSION_V1, hash: hasher.digest("hex") };
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const prototype = Reflect.getPrototypeOf(value);

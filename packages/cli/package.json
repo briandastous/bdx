@@ -7,6 +7,10 @@
   "bin": {
     "bdx": "dist/bin.js"
   },
+  "oclif": {
+    "bin": "bdx",
+    "commands": "./dist/commands"
+  },
   "scripts": {
     "build": "tsc -b",
     "dev": "tsx watch src/bin.ts"
@@ -14,6 +18,10 @@
   "dependencies": {
     "@bdx/config": "workspace:*",
     "@bdx/db": "workspace:*",
-    "@bdx/observability": "workspace:*"
+    "@bdx/engine": "workspace:*",
+    "@bdx/ingest": "workspace:*",
+    "@bdx/observability": "workspace:*",
+    "@bdx/twitterapi-io": "workspace:*",
+    "@oclif/core": "^4.0.33"
   }
 }

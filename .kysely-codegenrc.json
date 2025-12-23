@@ -1,0 +1,8 @@
+{
+  "dialect": "postgres",
+  "outFile": "./packages/db/src/database.ts",
+  "typeMapping": {
+    "int8": "bigint",
+    "bigint": "bigint"
+  }
+}

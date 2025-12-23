@@ -10,7 +10,8 @@
   "include": ["src/**/*.ts"],
   "references": [
     { "path": "../db" },
-    { "path": "../observability" }
+    { "path": "../ingest" },
+    { "path": "../observability" },
+    { "path": "../twitterapi-io" }
   ]
 }
-

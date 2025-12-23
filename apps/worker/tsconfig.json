@@ -10,7 +10,7 @@
     { "path": "../../packages/config" },
     { "path": "../../packages/db" },
     { "path": "../../packages/engine" },
-    { "path": "../../packages/observability" }
+    { "path": "../../packages/observability" },
+    { "path": "../../packages/twitterapi-io" }
   ]
 }
-

@@ -21,8 +21,10 @@
       "@bdx/config": ["packages/config/src/index.ts"],
       "@bdx/db": ["packages/db/src/index.ts"],
       "@bdx/engine": ["packages/engine/src/index.ts"],
-      "@bdx/observability": ["packages/observability/src/index.ts"]
+      "@bdx/ingest": ["packages/ingest/src/index.ts"],
+      "@bdx/observability": ["packages/observability/src/index.ts"],
+      "@bdx/twitterapi-io": ["packages/twitterapi-io/src/index.ts"],
+      "@bdx/twitterapi-io-types": ["packages/twitterapi-io-types/src/index.ts"]
     }
   }
 }
-

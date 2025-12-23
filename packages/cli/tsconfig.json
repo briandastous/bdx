@@ -11,7 +11,9 @@
   "references": [
     { "path": "../config" },
     { "path": "../db" },
-    { "path": "../observability" }
+    { "path": "../engine" },
+    { "path": "../ingest" },
+    { "path": "../observability" },
+    { "path": "../twitterapi-io" }
   ]
 }
-

@@ -159,7 +159,7 @@ The parity source of truth is the legacy codebase (`bdastous_monorepo`).
 
 ### Testing Stack (Decision)
 
-- Use `docker-compose` Postgres for the human local/dev stack.
+- Use `docker-compose` Postgres for the human local/dev stack (latest major: Postgres 18).
 - Use `testcontainers` Postgres for automated integration tests so tests are hermetic and do not depend on a fixed local port or pre-running DB.
 
 ### Ingest Metadata (Decision)
@@ -377,308 +377,316 @@ The authoritative register is maintained in `docs/parity/invariant-register.md` 
 
 ### Phase 2: Postgres Schema Design (Core Graph + Ingest)
 
-- [ ] Use Phase 1 parity artifacts as inputs/checklists for Phase 2.
-  - [ ] Behavioral source of truth: `docs/parity/inventory.md` (ingest semantics + required fields).
-  - [ ] Invariants source of truth: `docs/parity/invariant-register.md` (update entries with concrete Postgres enforcement + test locations as they land).
-  - [ ] Coverage tracking: `docs/parity/test-matrix.md` and `docs/parity/legacy-tests.md` (mark coverage as implemented).
-- [ ] Establish the rewrite’s migration baseline (Option B).
-  - [ ] Rewrite `packages/db/src/migrations/0001_init.ts` to create the foundation schema for the rewrite (extensions/enums/base tables as needed).
-  - [ ] After `0001_init.ts` is rewritten for the rewrite, treat subsequent migrations as append-only and immutable.
-- [ ] Apply the repo’s primary key strategy in all Phase 2 migrations (see “IDs + Keys (Decision)”).
-  - [ ] Use `bigint generated always as identity` surrogate primary keys for internal tables.
-  - [ ] Use upstream X/Twitter IDs as the primary keys for `users` and `posts` (`users.id`, `posts.id`).
-- [ ] Map legacy Gel constraints to Postgres constraints for core graph + ingest tables (using `dbschema/default.gel` as the source).
-  - [ ] For each invariant, choose enforcement per “Constraints (Policy)” and record it in `docs/parity/invariant-register.md`.
-- [ ] Design and implement migrations for core graph entities.
-  - [ ] `users`
-    - [ ] `id` is the X user ID (`bigint` primary key) + stable identity fields.
-    - [ ] `handle` + `handle_norm` (generated) with case-insensitive uniqueness and handle reassignment semantics.
-    - [ ] soft-delete (`deleted_at`) and “revive on re-seen” semantics.
-    - [ ] “last ingest” metadata pointers (run IDs/timestamps) where helpful.
-  - [ ] `user_handle_history`
-    - [ ] record handle changes with timestamps and source ingest event linkage.
-  - [ ] `follows`
-    - [ ] unique edge `(follower_id, target_id)` with soft-delete + revive.
-    - [ ] indexes to support “followers of X” and “followings of X”.
-  - [ ] `posts`
-    - [ ] `id` is the X post ID (`bigint` primary key), link to author, `posted_at`, text/lang, raw JSON.
-    - [ ] index to support “posts by author ordered by posted_at”.
-- [ ] Design and implement migrations for ingest metadata.
-  - [ ] `ingest_events` (base table) with kind + timestamps + correlation IDs.
-  - [ ] `followers_sync_runs`, `followings_sync_runs`, and `posts_sync_runs` (detail tables keyed by `ingest_event_id`) with:
-    - [ ] status enum, timestamps, cursor exhaustion flags,
-    - [ ] last upstream HTTP metadata (status code, error payload, retry-after if relevant),
-    - [ ] per-run parameters (`sync_mode`, `since`, target user IDs, etc.).
-    - [ ] `CHECK` constraint for status/completed_at invariants.
-  - [ ] `webhook_follow_events` (detail table keyed by `ingest_event_id`) for “new follower” webhooks.
-  - [ ] join tables for multi-target runs (e.g., `posts_sync_run_target_users`).
-  - [ ] ensure all ingest writes can be associated to a run/event for auditing.
-- [ ] Add Postgres advisory lock conventions for:
-  - [ ] migrations (single migrator),
-  - [ ] per-instance materialization (Phase 4+),
-  - [ ] per-target ingest (optional; if needed for correctness/throughput).
+- [x] Use Phase 1 parity artifacts as inputs/checklists for Phase 2.
+  - [x] Behavioral source of truth: `docs/parity/inventory.md` (ingest semantics + required fields).
+  - [x] Invariants source of truth: `docs/parity/invariant-register.md` (update entries with concrete Postgres enforcement + test locations as they land).
+  - [x] Coverage tracking: `docs/parity/test-matrix.md` and `docs/parity/legacy-tests.md` (mark coverage as implemented).
+- [x] Establish the rewrite’s migration baseline (Option B).
+  - [x] Rewrite `packages/db/src/migrations/0001_init.ts` to create the foundation schema for the rewrite (extensions/enums/base tables as needed).
+  - [x] After `0001_init.ts` is rewritten for the rewrite, treat subsequent migrations as append-only and immutable.
+- [x] Apply the repo’s primary key strategy in all Phase 2 migrations (see “IDs + Keys (Decision)”).
+  - [x] Use `bigint generated always as identity` surrogate primary keys for internal tables.
+  - [x] Use upstream X/Twitter IDs as the primary keys for `users` and `posts` (`users.id`, `posts.id`).
+- [x] Map legacy Gel constraints to Postgres constraints for core graph + ingest tables (using `dbschema/default.gel` as the source).
+  - [x] For each invariant, choose enforcement per “Constraints (Policy)” and record it in `docs/parity/invariant-register.md`.
+- [x] Design and implement migrations for core graph entities.
+  - [x] `users`
+    - [x] `id` is the X user ID (`bigint` primary key) + stable identity fields.
+    - [x] `handle` + `handle_norm` (generated) with case-insensitive uniqueness and handle reassignment semantics.
+    - [x] soft-delete (`deleted_at`) and “revive on re-seen” semantics.
+    - [x] “last ingest” metadata pointers (run IDs/timestamps) where helpful.
+  - [x] `user_handle_history`
+    - [x] record handle changes with timestamps and source ingest event linkage.
+  - [x] `follows`
+    - [x] unique edge `(follower_id, target_id)` with soft-delete + revive.
+    - [x] indexes to support “followers of X” and “followings of X”.
+  - [x] `posts`
+    - [x] `id` is the X post ID (`bigint` primary key), link to author, `posted_at`, text/lang, raw JSON.
+    - [x] index to support “posts by author ordered by posted_at”.
+- [x] Design and implement migrations for ingest metadata.
+  - [x] `ingest_events` (base table) with kind + timestamps + correlation IDs.
+  - [x] `followers_sync_runs`, `followings_sync_runs`, and `posts_sync_runs` (detail tables keyed by `ingest_event_id`) with:
+    - [x] status enum, timestamps, cursor exhaustion flags,
+    - [x] last upstream HTTP metadata (status code, error payload, retry-after if relevant),
+    - [x] per-run parameters (`sync_mode`, `since`, target user IDs, etc.).
+    - [x] `CHECK` constraint for status/completed_at invariants.
+  - [x] `webhook_follow_events` (detail table keyed by `ingest_event_id`) for “new follower” webhooks.
+  - [x] join tables for multi-target runs (e.g., `posts_sync_run_target_users`).
+  - [x] ensure all ingest writes can be associated to a run/event for auditing.
+  - [x] Add Postgres advisory lock conventions for:
+  - [x] migrations (single migrator),
+  - [x] per-instance materialization (Phase 4+),
+  - [x] per-target ingest (optional; if needed for correctness/throughput).
 
 ### Phase 3: Postgres Schema Design (Assets + Materializations + Membership)
 
-- [ ] Use Phase 1 parity artifacts as inputs/checklists for Phase 3.
-  - [ ] Behavioral source of truth: `docs/parity/inventory.md` (asset slugs/params shapes, membership semantics, “first appearance” rules).
-  - [ ] Invariants source of truth: `docs/parity/invariant-register.md` (update entries with concrete Postgres enforcement + test locations as they land).
-  - [ ] Coverage tracking: `docs/parity/test-matrix.md` and `docs/parity/legacy-tests.md` (mark coverage as implemented).
-- [ ] Map legacy Gel constraints to Postgres constraints for asset params/instances/materializations/events/membership (using `dbschema/default.gel` as the source).
-  - [ ] Decide how to model “asset items” so membership/events can have enforceable uniqueness and (when possible) foreign keys.
-  - [ ] For each invariant, choose enforcement per “Constraints (Policy)” and record it in `docs/parity/invariant-register.md`.
-- [ ] Design and implement the foundational asset tables.
-  - [ ] asset instance identity
-    - [ ] `asset_params` (or per-slug params tables) with `(asset_slug, params_hash)` uniqueness.
-    - [ ] `asset_instances` with a 1:1 relationship to params and query-friendly `asset_slug/params_hash` columns.
-  - [ ] “maintenance intent”
-    - [ ] `asset_instance_roots` for operator-enabled root instances (soft-disable with timestamp).
-    - [ ] `asset_instance_fanout_roots` describing fanout behavior from a source instance.
-  - [ ] materializations + provenance
-    - [ ] `asset_materializations` (immutable run records) with:
-      - [ ] `inputs_hash`,
-      - [ ] links to `dependency_materializations`,
-      - [ ] links to `requested_by_materializations`,
-      - [ ] status enum + timestamps + error payload.
-  - [ ] events + membership projection
-    - [ ] typed events tables (segments → users, post corpora → posts) with `event_type` (`enter`/`exit`) and `UNIQUE(materialization_id, item_id)`.
-      - [ ] add `CHECK` constraints for enter-only fields (e.g., `is_first_appearance`).
-      - [ ] add optional `*_enter_events` / `*_exit_events` views for readability.
-    - [ ] typed membership snapshot tables storing current membership checkpoint per instance (segments → users, post corpora → posts).
-    - [ ] `asset_instance.current_membership_materialization_id` pointer (or equivalent).
-  - [ ] Design segment-specific and post-corpus-specific tables needed for v1 parity.
-  - [ ] segments
-    - [ ] tables for segment materializations and typed membership (user IDs).
-    - [ ] tables for mutable segment inputs that affect `inputs_hash` but not params identity (e.g., “specified users set”).
-  - [ ] post corpora
-    - [ ] tables for post-corpus materializations and typed membership (post IDs).
-    - [ ] event fields for “first appearance” semantics (store on events table for `event_type='enter'` with `CHECK` constraint).
-- [ ] Add planner decision/event tables used for auditability.
-  - [ ] `scheduler_planner_events` (or equivalent) with decision + reason + references to runs/materializations.
-  - [ ] optional: `scheduler_policy_overrides` if needed for parity or future policy tuning.
+- [x] Use Phase 1 parity artifacts as inputs/checklists for Phase 3.
+  - [x] Behavioral source of truth: `docs/parity/inventory.md` (asset slugs/params shapes, membership semantics, “first appearance” rules).
+  - [x] Invariants source of truth: `docs/parity/invariant-register.md` (update entries with concrete Postgres enforcement + test locations as they land).
+  - [x] Coverage tracking: `docs/parity/test-matrix.md` and `docs/parity/legacy-tests.md` (mark coverage as implemented).
+- [x] Map legacy Gel constraints to Postgres constraints for asset params/instances/materializations/events/membership (using `dbschema/default.gel` as the source).
+  - [x] Decide how to model “asset items” so membership/events can have enforceable uniqueness and (when possible) foreign keys.
+  - [x] For each invariant, choose enforcement per “Constraints (Policy)” and record it in `docs/parity/invariant-register.md`.
+- [x] Design and implement the foundational asset tables.
+  - [x] asset instance identity
+    - [x] `asset_params` (or per-slug params tables) with `(asset_slug, params_hash)` uniqueness.
+    - [x] `asset_instances` with a 1:1 relationship to params and query-friendly `asset_slug/params_hash` columns.
+  - [x] “maintenance intent”
+    - [x] `asset_instance_roots` for operator-enabled root instances (soft-disable with timestamp).
+    - [x] `asset_instance_fanout_roots` describing fanout behavior from a source instance.
+  - [x] materializations + provenance
+    - [x] `asset_materializations` (immutable run records) with:
+      - [x] `inputs_hash`,
+      - [x] links to `dependency_materializations`,
+      - [x] links to `requested_by_materializations`,
+      - [x] status enum + timestamps + error payload.
+  - [x] events + membership projection
+    - [x] typed events tables (segments → users, post corpora → posts) with `event_type` (`enter`/`exit`) and `UNIQUE(materialization_id, item_id)`.
+      - [x] add `CHECK` constraints for enter-only fields (e.g., `is_first_appearance`).
+      - [x] add optional `*_enter_events` / `*_exit_events` views for readability.
+    - [x] typed membership snapshot tables storing current membership checkpoint per instance (segments → users, post corpora → posts).
+    - [x] `asset_instance.current_membership_materialization_id` pointer (or equivalent).
+  - [x] Design segment-specific and post-corpus-specific tables needed for v1 parity.
+  - [x] segments
+    - [x] tables for segment materializations and typed membership (user IDs).
+    - [x] tables for mutable segment inputs that affect `inputs_hash` but not params identity (e.g., “specified users set”).
+  - [x] post corpora
+    - [x] tables for post-corpus materializations and typed membership (post IDs).
+    - [x] event fields for “first appearance” semantics (store on events table for `event_type='enter'` with `CHECK` constraint).
+- [x] Add planner decision/event tables used for auditability.
+  - [x] `scheduler_planner_events` (or equivalent) with decision + reason + references to runs/materializations.
+  - [x] optional: `scheduler_policy_overrides` if needed for parity or future policy tuning.
 
 ### Phase 4: DB Access Layer + Codegen + Query Utilities
 
-- [ ] Integrate `kysely-codegen` for schema→types generation (or an equivalent approach).
-  - [ ] Decide whether generated DB types are committed or generated in CI.
-  - [ ] Add a stable command for regeneration and a diff check for accidental drift.
-  - [ ] Ensure generated types match runtime behavior:
-    - [ ] Postgres `bigint` → TypeScript `bigint` (aligned with postgres-js BigInt parsing).
-    - [ ] `json/jsonb` → `unknown` (or a safe JSON value type), decoded/validated at boundaries.
-- [ ] Implement DB module conventions.
-  - [ ] connection pool configuration (timeouts, max connections, statement timeouts).
-  - [ ] transaction helpers (explicit transaction boundaries in repositories/services).
-  - [ ] advisory lock helpers (scoped acquire/release + timeout behavior).
-- [ ] Implement shared Kysely query utilities (avoid duplicated ad-hoc queries).
-  - [ ] projections (stable field selection helpers for common read shapes).
-  - [ ] joins (common relationship joins expressed once).
-  - [ ] filters (soft-delete semantics, status predicates, etc.).
-  - [ ] cursor pagination utilities using `kysely-cursor` (or equivalent).
-    - [ ] define a shared cursor/page result shape and consistent ordering rules.
-    - [ ] add tests for pagination stability (deterministic order + no duplicates across pages).
-  - [ ] When introducing a new Kysely pattern (upserts, JSONB operators, lateral joins, etc.):
-    - [ ] update `docs/runbooks/kysely.md`,
-    - [ ] prefer encoding the pattern as a reusable helper in `packages/db`.
-- [ ] Implement repositories for core graph and ingest metadata.
-  - [ ] Users repository:
-    - [ ] upsert by X user ID (`users.id`),
-    - [ ] handle history update with uniqueness enforcement,
-    - [ ] soft-delete + revive paths.
-  - [ ] Follows repository:
-    - [ ] upsert edge + revive,
-    - [ ] soft-delete removed edges for full refresh,
-    - [ ] efficient “diff” queries to compare stored actives vs upstream actives.
-  - [ ] Posts repository:
-    - [ ] upsert by X post ID (`posts.id`) + revive,
-    - [ ] author linkage and ordering queries.
-  - [ ] Ingest runs repository:
-    - [ ] create/update run status,
-    - [ ] persist last HTTP metadata and error payloads,
-    - [ ] query run history for “since cursor” planning.
-- [ ] Implement repositories for asset system (instances/materializations/events/membership).
-  - [ ] instance CRUD (create deterministic instances from params; enforce uniqueness).
-  - [ ] materialization insert + status transitions.
-  - [ ] enter/exit event insertion helpers.
-  - [ ] membership snapshot read/write helpers.
+- [x] Integrate `kysely-codegen` for schema→types generation (or an equivalent approach).
+  - [x] Decide whether generated DB types are committed or generated in CI.
+  - [x] Add a stable command for regeneration and a diff check for accidental drift.
+  - [x] Ensure generated types match runtime behavior:
+    - [x] Postgres `bigint` → TypeScript `bigint` (aligned with postgres-js BigInt parsing).
+    - [x] `json/jsonb` → `unknown` (or a safe JSON value type), decoded/validated at boundaries.
+- [x] Implement DB module conventions.
+  - [x] connection pool configuration (timeouts, max connections, statement timeouts).
+  - [x] transaction helpers (explicit transaction boundaries in repositories/services).
+  - [x] advisory lock helpers (scoped acquire/release + timeout behavior).
+- [x] Implement shared Kysely query utilities (avoid duplicated ad-hoc queries).
+  - [x] projections (stable field selection helpers for common read shapes).
+  - [x] joins (common relationship joins expressed once).
+  - [x] filters (soft-delete semantics, status predicates, etc.).
+  - [x] cursor pagination utilities using `kysely-cursor` (or equivalent).
+    - [x] define a shared cursor/page result shape and consistent ordering rules.
+    - [x] add tests for pagination stability (deterministic order + no duplicates across pages).
+  - [x] When introducing a new Kysely pattern (upserts, JSONB operators, lateral joins, etc.):
+    - [x] update `docs/runbooks/kysely.md`,
+    - [x] prefer encoding the pattern as a reusable helper in `packages/db`.
+- [x] Implement repositories for core graph and ingest metadata.
+  - [x] Users repository:
+    - [x] upsert by X user ID (`users.id`),
+    - [x] handle history update with uniqueness enforcement,
+    - [x] soft-delete + revive paths.
+  - [x] Follows repository:
+    - [x] upsert edge + revive,
+    - [x] soft-delete removed edges for full refresh,
+    - [x] efficient “diff” queries to compare stored actives vs upstream actives.
+  - [x] Posts repository:
+    - [x] upsert by X post ID (`posts.id`) + revive,
+    - [x] author linkage and ordering queries.
+  - [x] Ingest runs repository:
+    - [x] create/update run status,
+    - [x] persist last HTTP metadata and error payloads,
+    - [x] query run history for “since cursor” planning.
+- [x] Implement repositories for asset system (instances/materializations/events/membership).
+  - [x] instance CRUD (create deterministic instances from params; enforce uniqueness).
+  - [x] materialization insert + status transitions.
+  - [x] enter/exit event insertion helpers.
+  - [x] membership snapshot read/write helpers.
 
 ### Phase 5: twitterapi.io Client (Typed + Rate-Limit Aware)
 
-- [ ] Establish an OpenAPI-driven generation workflow for twitterapi.io (parity with legacy `openapi/twitterapi.io.yaml` + generator script).
-  - [ ] Copy `openapi/twitterapi.io.yaml` into this repo (as the pinned contract for codegen and review).
-  - [ ] Add a `pnpm`-based generator script (analogous to legacy `uvx` workflow) that runs without permanently adding codegen dependencies to the workspace.
-    - [ ] Prefer `pnpm dlx` with a pinned generator version.
-  - [ ] Generate TypeScript types (and only types) from the OpenAPI spec.
-    - [ ] Keep generated types in a dedicated internal package and treat them as generated artifacts.
-    - [ ] Add an import boundary so only the handwritten adapter layer imports the generated types.
-- [ ] Implement a typed twitterapi.io client module.
-  - [ ] define request/response types for the required endpoints (user lookup, followers, followings, posts search).
-  - [ ] implement error mapping:
-    - [ ] rate-limit detection and retry-after parsing,
-    - [ ] transient vs terminal errors.
-  - [ ] capture HTTP metadata needed for auditability (status, headers, request id if available).
-- [ ] Add a test harness for the client.
-  - [ ] unit tests for error mapping and pagination.
-  - [ ] optionally: fixture-based tests for parsing (no live network calls in CI).
+- [x] Establish an OpenAPI-driven generation workflow for twitterapi.io (parity with legacy `openapi/twitterapi.io.yaml` + generator script).
+  - [x] Copy `openapi/twitterapi.io.yaml` into this repo (as the pinned contract for codegen and review).
+  - [x] Add a `pnpm`-based generator script (analogous to legacy `uvx` workflow) that runs without permanently adding codegen dependencies to the workspace.
+    - [x] Prefer `pnpm dlx` with a pinned generator version.
+  - [x] Generate TypeScript types (and only types) from the OpenAPI spec.
+    - [x] Keep generated types in a dedicated internal package and treat them as generated artifacts.
+    - [x] Add an import boundary so only the handwritten adapter layer imports the generated types.
+- [x] Implement a typed twitterapi.io client module.
+  - [x] define request/response types for the required endpoints (user lookup, followers, followings, posts search).
+  - [x] implement error mapping:
+    - [x] rate-limit detection and retry-after parsing,
+    - [x] transient vs terminal errors.
+  - [x] capture HTTP metadata needed for auditability (status, headers, request id if available).
+- [x] Add a test harness for the client.
+  - [x] unit tests for error mapping and pagination.
+  - [x] fixture-based tests for parsing (no live network calls in CI).
 
 ### Phase 6: Ingest Jobs (Followers/Followings/Posts)
 
-- [ ] Implement followers and followings sync jobs with parity semantics.
-  - [ ] inputs (target user id / handle, mode incremental/full, pagination cursor options).
-  - [ ] create an ingest run record at start and update it through completion/failure.
-  - [ ] fetch pages with backoff/rate-limit handling.
-  - [ ] upsert users discovered during traversal.
-  - [ ] upsert follow edges and revive on re-seen.
-  - [ ] for full refresh:
-    - [ ] compute removals and soft-delete missing edges.
-  - [ ] for incremental:
-    - [ ] stop conditions based on encountering existing relationships (parity with current behavior).
-- [ ] Implement posts sync job(s) with parity semantics.
-  - [ ] design the query/windowing strategy (respect upstream max query length and result window limits).
-  - [ ] persist posts upserted by X post ID (`posts.id`) and revive on re-seen.
-  - [ ] persist per-run metadata and “synced since” semantics for later planning.
-  - [ ] implement batching logic consistent with the planner’s needs (chunk sizes, overlap windows).
-- [ ] Ensure every ingest write is traceable to a run/event record.
+- [x] Implement followers and followings sync jobs with parity semantics.
+  - [x] inputs (target user id / handle, mode incremental/full, pagination cursor options).
+  - [x] create an ingest run record at start and update it through completion/failure.
+  - [x] fetch pages with backoff/rate-limit handling.
+  - [x] upsert users discovered during traversal.
+  - [x] upsert follow edges and revive on re-seen.
+  - [x] for full refresh:
+    - [x] compute removals and soft-delete missing edges.
+  - [x] for incremental:
+    - [x] stop conditions based on encountering existing relationships (parity with current behavior).
+- [x] Implement posts sync job(s) with parity semantics.
+  - [x] design the query/windowing strategy (respect upstream max query length and result window limits).
+  - [x] persist posts upserted by X post ID (`posts.id`) and revive on re-seen.
+  - [x] persist per-run metadata and “synced since” semantics for later planning.
+  - [x] implement batching logic consistent with the planner’s needs (chunk sizes, overlap windows).
+- [x] Ensure every ingest write is traceable to a run/event record.
 
 ### Phase 7: Asset Definitions (Segments + Post Corpora)
 
-- [ ] Implement the code-defined asset registry.
-  - [ ] define a stable “asset slug” convention and registry lookup.
-  - [ ] define params types per asset slug and deterministic params hashing.
-  - [ ] define dependency specs (other assets) and ingest dependency specs (required ingests + staleness policy).
-- [ ] Implement segment assets with parity semantics.
-  - [ ] specified users segment:
-    - [ ] params shape (identity),
-    - [ ] mutable input table for the user set (affects inputs hash),
-    - [ ] materialization logic producing membership (user IDs).
-  - [ ] followers segment / mutuals segment (and any other required segment types):
-    - [ ] params shape,
-    - [ ] dependencies on ingested graph state,
-    - [ ] materialization logic.
-- [ ] Implement post-corpus assets with parity semantics.
-  - [ ] SegmentPostCorpus (posts authored by members of a segment instance):
-    - [ ] resolve membership “as-of” a dependency segment materialization,
-    - [ ] produce membership (post IDs),
-    - [ ] implement “first appearance” semantics if required.
+- [x] Implement the code-defined asset registry.
+  - [x] define a stable “asset slug” convention and registry lookup.
+  - [x] define params types per asset slug and deterministic params hashing.
+  - [x] define dependency specs (other assets) and ingest dependency specs (required ingests + staleness policy).
+- [x] Implement segment assets with parity semantics.
+  - [x] specified users segment:
+    - [x] params shape (identity),
+    - [x] mutable input table for the user set (affects inputs hash),
+    - [x] materialization logic producing membership (user IDs).
+  - [x] followers segment / mutuals segment (and any other required segment types):
+    - [x] params shape,
+    - [x] dependencies on ingested graph state,
+    - [x] materialization logic.
+- [x] Implement post-corpus assets with parity semantics.
+  - [x] SegmentPostCorpus (posts authored by members of a segment instance):
+    - [x] resolve membership “as-of” a dependency segment materialization,
+    - [x] produce membership (post IDs),
+    - [x] implement “first appearance” semantics if required.
 
 ### Phase 8: Asset Instance Execution Engine (Planner + Runner)
 
-- [ ] Implement the planner core loop.
-  - [ ] load enabled roots and fanout roots.
-  - [ ] validate roots and record planner events on invalid configuration.
-  - [ ] expand dependency closure deterministically (create missing dependency instances when safe/deterministic).
-  - [ ] resolve ingest prerequisites from instance params and dependency materializations.
-  - [ ] determine staleness/recency and trigger ingest inline as needed.
-  - [ ] select dependency materializations and compute:
-    - [ ] `inputs_hash`,
-    - [ ] dependency revisions hash equivalent,
-    - [ ] “no-op” decision when nothing changed.
-  - [ ] record planner decisions for:
-    - [ ] lock contention/timeouts,
-    - [ ] ingest failures,
-    - [ ] missing materializations,
-    - [ ] validation errors.
-- [ ] Implement materialization execution with advisory locks.
-  - [ ] per-instance lock acquisition (with timeout) to avoid concurrent runs.
-  - [ ] insert `asset_materialization` record at start and transition status on completion/failure.
-  - [ ] compute membership diff vs prior snapshot and insert enter/exit events.
-  - [ ] update membership snapshot atomically on success.
-- [ ] Implement membership “as-of” reads.
-  - [ ] define ordering semantics for the `(target, checkpoint]` window (materialization time + stable tie-breakers).
-  - [ ] implement rewind algorithm per “Membership “As-Of” Reads (Decision)” (toggle parity over events).
-  - [ ] add indexes to keep rewind queries performant (by instance + materialization time + item).
-- [ ] Implement checkpoint repair.
-  - [ ] detect invalid/missing snapshots for an instance.
-  - [ ] rebuild snapshot from a known good baseline (or from scratch) using event history.
-  - [ ] record planner events when repair occurs.
+- [x] Implement the planner core loop.
+  - [x] load enabled roots and fanout roots.
+  - [x] validate roots and record planner events on invalid configuration.
+  - [x] expand dependency closure deterministically (create missing dependency instances when safe/deterministic).
+  - [x] resolve ingest prerequisites from instance params and dependency materializations.
+  - [x] determine staleness/recency and trigger ingest inline as needed.
+  - [x] select dependency materializations and compute:
+    - [x] `inputs_hash`,
+    - [x] dependency revisions hash equivalent,
+    - [x] “no-op” decision when nothing changed.
+  - [x] record planner decisions for:
+    - [x] lock contention/timeouts,
+    - [x] ingest failures,
+    - [x] missing materializations,
+    - [x] validation errors.
+- [x] Implement materialization execution with advisory locks.
+  - [x] per-instance lock acquisition (with timeout) to avoid concurrent runs.
+  - [x] insert `asset_materialization` record at start and transition status on completion/failure.
+  - [x] compute membership diff vs prior snapshot and insert enter/exit events.
+  - [x] update membership snapshot atomically on success.
+- [x] Implement membership “as-of” reads.
+  - [x] define ordering semantics for the `(target, checkpoint]` window (materialization time + stable tie-breakers).
+  - [x] implement rewind algorithm per “Membership “As-Of” Reads (Decision)” (toggle parity over events).
+  - [x] add indexes to keep rewind queries performant (by instance + materialization time + item).
+- [x] Implement checkpoint repair.
+  - [x] detect invalid/missing snapshots for an instance.
+  - [x] rebuild snapshot from a known good baseline (or from scratch) using event history.
+  - [x] record planner events when repair occurs.
 
 ### Phase 9: Worker Service (Long-Running Engine Runner)
 
-- [ ] Harden the worker service to run continuously.
-  - [ ] migrations-on-start controlled by env var and guarded by advisory lock.
-  - [ ] graceful shutdown and signal handling.
-  - [ ] configurable tick cadence and a “single tick then exit” mode for ops.
-  - [ ] structured logging and correlation fields.
-- [ ] Add worker health reporting.
-  - [ ] process-level heartbeat (log + DB marker) for “worker is alive”.
-  - [ ] optional HTTP `/healthz` endpoint for the worker if the deploy platform benefits from it.
+- [x] Harden the worker service to run continuously.
+  - [x] migrations-on-start controlled by env var and guarded by advisory lock.
+  - [x] graceful shutdown and signal handling.
+  - [x] configurable tick cadence and a “single tick then exit” mode for ops.
+  - [x] structured logging and correlation fields.
+- [x] Add worker health reporting.
+  - [x] process-level heartbeat (log + DB marker) for “worker is alive”.
+  - [x] optional HTTP `/healthz` endpoint for the worker if the deploy platform benefits from it.
 
 ### Phase 10: HTTP API Service (Webhook + Operator Read APIs)
 
-- [ ] Use explicit dependency injection for DB access (no `fastify-kysely` decoration) and standardize route patterns accordingly.
-  - [ ] Keep routes thin: validate → call repositories/services → map errors → respond.
-  - [ ] Ensure DB lifecycle is tied to server lifecycle (auto-destroy/close on server close).
-- [ ] Generate OpenAPI docs from runtime validation schemas (Zod-first).
-  - [ ] Pick and document the Zod→OpenAPI approach and keep it consistent across routes.
-  - [ ] Serve an OpenAPI JSON document (e.g., `/openapi.json`) for agent/client consumption.
-  - [ ] Document API/OpenAPI conventions in `docs/runbooks/api.md` (ID formats, error shapes, pagination, auth).
-- [ ] Implement webhook ingestion endpoint(s).
-  - [ ] token-based auth (query param or header).
-  - [ ] runtime validation (Zod).
-  - [ ] persist webhook event record with traceability fields.
-  - [ ] upsert relevant graph records (users/follows) as part of webhook handling.
-  - [ ] error mapping:
-    - [ ] 4xx for invalid input/auth,
-    - [ ] 503 with retry hints for upstream rate-limit errors (if enrichment occurs inline).
-- [ ] Add minimal operator read APIs (optional, but useful).
-  - [ ] endpoint(s) to inspect recent ingest runs and materializations by ID.
-  - [ ] endpoint(s) to list enabled roots/fanout roots and their current materialization status.
+- [x] Use explicit dependency injection for DB access (no `fastify-kysely` decoration) and standardize route patterns accordingly.
+  - [x] Keep routes thin: validate → call repositories/services → map errors → respond.
+  - [x] Ensure DB lifecycle is tied to server lifecycle (auto-destroy/close on server close).
+- [x] Generate OpenAPI docs from runtime validation schemas (Zod-first).
+  - [x] Pick and document the Zod→OpenAPI approach and keep it consistent across routes.
+  - [x] Serve an OpenAPI JSON document (e.g., `/openapi.json`) for agent/client consumption.
+  - [x] Document API/OpenAPI conventions in `docs/runbooks/api.md` (ID formats, error shapes, pagination, auth).
+- [x] Implement webhook ingestion endpoint(s).
+  - [x] token-based auth (query param or header).
+  - [x] runtime validation (Zod).
+  - [x] persist webhook event record with traceability fields.
+  - [x] upsert relevant graph records (users/follows) as part of webhook handling.
+  - [x] error mapping:
+    - [x] 4xx for invalid input/auth,
+    - [x] 503 with retry hints for upstream rate-limit errors (if enrichment occurs inline).
+- [x] Add minimal operator read APIs (optional, but useful).
+  - [x] endpoint(s) to inspect recent ingest runs and materializations by ID.
+  - [x] endpoint(s) to list enabled roots/fanout roots and their current materialization status.
 
 ### Phase 11: CLI (Operator Tools)
 
-- [ ] Decide final CLI framework (oclif as default) and migrate the CLI package to it.
-  - [ ] `db:migrate` (run migrations with lock).
-  - [ ] `ingest:followers`, `ingest:followings`, `ingest:posts` (ad-hoc ingest runs).
-  - [ ] `assets:roots` management:
-    - [ ] enable/disable root instances,
-    - [ ] create instances deterministically from params.
-  - [ ] `assets:materialize` / `worker:tick` (force a single planner tick).
-  - [ ] ergonomic output: IDs, statuses, and “where to look in logs”.
+- [x] Decide final CLI framework (oclif as default) and migrate the CLI package to it.
+  - [x] `db:migrate` (run migrations with lock).
+  - [x] `ingest:followers`, `ingest:followings`, `ingest:posts` (ad-hoc ingest runs).
+  - [x] `assets:roots` management:
+    - [x] enable/disable root instances,
+    - [x] create instances deterministically from params.
+  - [x] `assets:materialize` / `worker:tick` (force a single planner tick).
+  - [x] ergonomic output: IDs, statuses, and “where to look in logs”.
 
 ### Phase 12: Observability + Operational Hardening
 
-- [ ] Add correlation IDs and structured logging conventions.
-  - [ ] standard fields: `service`, `env`, `run_id`, `materialization_id`, `asset_instance_id`, `asset_slug`.
-  - [ ] propagate IDs through service layers without `any` escape hatches.
-- [ ] Add Postgres-level safety controls.
-  - [ ] statement timeouts for long queries.
-  - [ ] idempotent “upsert” patterns to tolerate retries.
-- [ ] Audit persisted provenance volume and add retention policies once logging/tracing is verified.
-  - [ ] avoid storing large request/response bodies unless we can demonstrate they are queried/useful.
-  - [ ] add DB-level retention (time-based deletes) for high-volume event/run tables where safe.
+- [x] Add correlation IDs and structured logging conventions.
+  - [x] standard fields: `service`, `env`, `run_id`, `materialization_id`, `asset_instance_id`, `asset_slug`.
+  - [x] propagate IDs through service layers without `any` escape hatches.
+- [x] Add Postgres-level safety controls.
+  - [x] statement timeouts for long queries.
+  - [x] idempotent “upsert” patterns to tolerate retries.
+- [x] Audit persisted provenance volume and add retention policies once logging/tracing is verified.
+  - [x] Use ingest event timestamps (no `created_at` on sync runs) as the retention clock.
+  - [x] Store HTTP request/response snapshots only on ingest failures; truncate response bodies.
+  - [x] Retention windows (config-driven):
+    - [x] planner events: 30 days (`retention.plannerEventsDays`).
+    - [x] ingest events/runs/meta: 90 days (`retention.ingestEventsDays`).
+    - [x] webhook events: 180 days (`retention.webhookEventsDays`).
+    - [x] handle history: no retention (keep indefinitely).
+    - [x] asset materializations/events: no retention yet (needed for membership as-of + checkpoint repair).
+  - [x] Schedule retention as a bounded maintenance task (worker interval with advisory lock), period is config-driven (`retention.periodMs`).
 
 ### Phase 13: Testing + Validation (Parity Focus)
 
-- [ ] Use Phase 1 parity artifacts as the source of truth for what to test.
-  - [ ] Parity checklist: `docs/parity/test-matrix.md` (map each “Must port” behavior to tests or explicit manual verification).
-  - [ ] Legacy coverage inventory: `docs/parity/legacy-tests.md` (for each “retain” legacy test, ensure equivalent coverage exists in the rewrite, even if the test shape differs).
-- [ ] Build a layered test strategy.
-  - [ ] unit tests for hashing, params identity, and core planner decisions.
-  - [ ] repository tests using a real Postgres instance via testcontainers.
-  - [ ] ingest job tests with mocked upstream responses (fixture-based).
-  - [ ] engine/materialization integration tests:
-    - [ ] membership diff/event insertion,
-    - [ ] snapshot updates and as-of reads,
-    - [ ] lock contention handling.
-  - [ ] webhook API tests (auth, validation, DB writes).
-- [ ] Create a parity checklist and keep it green.
-  - [ ] for each “Must port” bullet, add at least one test (or an explicit manual verification step with instructions).
-  - [ ] for each “retain” legacy test, record where its coverage lives in the rewrite (new test path(s) + a short note on any intentional changes).
+- [x] Use Phase 1 parity artifacts as the source of truth for what to test.
+  - [x] Parity checklist: `docs/parity/test-matrix.md` (map each “Must port” behavior to tests or explicit manual verification).
+  - [x] Legacy coverage inventory: `docs/parity/legacy-tests.md` (for each “retain” legacy test, ensure equivalent coverage exists in the rewrite, even if the test shape differs).
+- [x] Build a layered test strategy.
+  - [x] unit tests for hashing and params identity.
+  - [x] core planner decisions (covered via engine integration tests).
+  - [x] repository tests using a real Postgres instance via testcontainers.
+  - [x] ingest job tests with mocked upstream responses (fixture-based).
+  - [x] engine/materialization integration tests:
+    - [x] membership diff/event insertion,
+    - [x] snapshot updates and as-of reads,
+    - [x] lock contention handling.
+  - [x] webhook API tests (auth, validation, DB writes).
+- [x] Create a parity checklist and keep it green.
+  - [x] for each “Must port” bullet, add at least one test (or an explicit manual verification step with instructions).
+  - [x] for each “retain” legacy test, record where its coverage lives in the rewrite (new test path(s) + a short note on any intentional changes).
 
 ### Phase 14: Local Dev + Deployment (Railway Staging/Prod)
 
-- [ ] Local dev UX.
-  - [ ] `docker-compose` Postgres with documented config:
-    - [ ] secrets/env vars (`.env.example` + `.env.local`),
-    - [ ] non-secret YAML overlays (`config/*.yaml`).
-  - [ ] one-command local run for API + worker (document exact commands).
-  - [ ] migration workflow for local dev (worker auto-migrate vs explicit CLI migrate).
-- [ ] Railway deployment shape.
-  - [ ] `api` service (Fastify) and `worker` service (engine runner), same repo, different entrypoints.
-  - [ ] Postgres (Railway-managed).
-  - [ ] avoid Railway cron jobs for the engine loop (use a long-running worker); reserve cron only for bounded maintenance tasks or “one tick then exit”.
-  - [ ] ensure migrations run only from `worker` with advisory lock and a kill switch (`RUN_MIGRATIONS=false`).
-  - [ ] staging environment first; promote to prod when stable.
-  - [ ] document how to run operator commands in staging/prod via Railway SSH against the `worker` service (optional dedicated `ops` service later if needed).
+- [x] Local dev UX.
+  - [x] `docker-compose` Postgres with documented config:
+    - [x] secrets/env vars (`.env.example` + `.env.local`),
+    - [x] non-secret YAML overlays (`config/*.yaml`).
+  - [x] one-command local run for API + worker (document exact commands).
+  - [x] migration workflow for local dev (worker auto-migrate vs explicit CLI migrate).
+- [x] Railway deployment shape.
+  - [x] `api` service (Fastify) and `worker` service (engine runner), same repo, different entrypoints.
+  - [x] Postgres (Railway-managed).
+  - [x] avoid Railway cron jobs for the engine loop (use a long-running worker); reserve cron only for bounded maintenance tasks or “one tick then exit”.
+  - [x] ensure migrations run only from `worker` with advisory lock and a kill switch (`RUN_MIGRATIONS=false`).
+  - [x] staging environment first; promote to prod when stable.
+  - [x] document how to run operator commands in staging/prod via Railway SSH against the `worker` service (optional dedicated `ops` service later if needed).
 
 ## Work to Consider Post-Migration
 

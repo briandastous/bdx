@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hashJsonV1, sha256Hex, stableJsonStringify } from "./hashing.js";
+import { hashJsonV1, hashPartsV1, sha256Hex, stableJsonStringify } from "./hashing.js";
 
 describe("sha256Hex", () => {
   it("hashes known values", () => {
@@ -31,3 +31,13 @@ describe("hashJsonV1", () => {
   });
 });
 
+describe("hashPartsV1", () => {
+  it("is stable and order-sensitive", () => {
+    const left = hashPartsV1(["alpha", "beta"]);
+    const right = hashPartsV1(["alpha", "beta"]);
+    const swapped = hashPartsV1(["beta", "alpha"]);
+
+    expect(left.hash).toBe(right.hash);
+    expect(left.hash).not.toBe(swapped.hash);
+  });
+});
