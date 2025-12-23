@@ -10,12 +10,14 @@ import type { AssetSlug } from "@bdx/db";
 import type { AssetParams, SegmentParams, SubjectSegmentParams } from "./params.js";
 import { paramsHashV1 } from "./params.js";
 import type {
+  AssetItemId,
   AssetItemKind,
   Awaitable,
   DependencySpec,
   IngestRequirement,
   ResolvedDependency,
 } from "./types.js";
+import type { AssetInstanceId, UserId } from "@bdx/ids";
 
 export interface AssetValidationIssue {
   code: string;
@@ -35,21 +37,21 @@ export interface AssetDefinition {
   ): Awaitable<IngestRequirement[]>;
   inputsHashParts(
     params: AssetParams,
-    context: { db: DbOrTx; instanceId: bigint },
+    context: { db: DbOrTx; instanceId: AssetInstanceId },
   ): Awaitable<string[]>;
   computeMembership(
     params: AssetParams,
     deps: ResolvedDependency[],
-    context: { db: DbOrTx; instanceId: bigint },
-  ): Promise<bigint[]>;
+    context: { db: DbOrTx; instanceId: AssetInstanceId },
+  ): Promise<AssetItemId[]>;
   validateInputs?(
     params: AssetParams,
-    context: { db: DbOrTx; instanceId: bigint },
+    context: { db: DbOrTx; instanceId: AssetInstanceId },
   ): Awaitable<AssetValidationIssue[]>;
   paramsHash(params: AssetParams): string;
   paramsFromFanoutItem?(
     itemKind: AssetItemKind,
-    itemExternalId: bigint,
+    itemExternalId: AssetItemId,
     fanoutSourceParamsHash: string | null,
   ): AssetParams;
 }
@@ -66,15 +68,16 @@ function expectSegmentParams(params: AssetParams, slug: SegmentParams["assetSlug
 function subjectParamsFromItem(
   slug: SubjectSegmentParams["assetSlug"],
   itemKind: AssetItemKind,
-  itemExternalId: bigint,
+  itemExternalId: AssetItemId,
   fanoutSourceParamsHash: string | null,
 ): AssetParams {
   if (itemKind !== "user") {
     throw new Error(`Fanout for ${slug} expects user items`);
   }
+  const userId = itemExternalId as UserId;
   const params: SubjectSegmentParams = {
     assetSlug: slug,
-    subjectExternalId: itemExternalId,
+    subjectExternalId: userId,
     fanoutSourceParamsHash,
   };
   return params;

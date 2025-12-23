@@ -1,8 +1,13 @@
 import { Command, Flags } from "@oclif/core";
 import { loadWorkerEnv } from "@bdx/config";
 import { PostsSyncService } from "@bdx/ingest";
-import { createDbFromEnv, createLoggerFromEnv, createTwitterClient, destroyDbSafely } from "../../lib/context.js";
-import { parseDate, parsePositiveBigInt } from "../../lib/parsers.js";
+import {
+  createDbFromEnv,
+  createLoggerFromEnv,
+  createTwitterClient,
+  destroyDbSafely,
+} from "../../lib/context.js";
+import { parseDate, parseUserId } from "../../lib/parsers.js";
 
 export default class IngestPosts extends Command {
   static override description = "Run a posts ingest for one or more X user ids.";
@@ -25,9 +30,7 @@ export default class IngestPosts extends Command {
 
   async run(): Promise<void> {
     const { flags } = await this.parse(IngestPosts);
-    const userIds = flags["user-id"].map((value, index) =>
-      parsePositiveBigInt(value, `user-id[${index}]`),
-    );
+    const userIds = flags["user-id"].map((value, index) => parseUserId(value, `user-id[${index}]`));
 
     const env = loadWorkerEnv();
     const logger = createLoggerFromEnv(env);

@@ -6,10 +6,12 @@ import { paginateQuery } from "../pagination.js";
 import { wherePostActive } from "../queries/filters.js";
 import { postSummaryColumns } from "../queries/projections.js";
 import { ensureUsers } from "./users.js";
+import type { IngestEventId, PostId, UserId } from "@bdx/ids";
+import { PostId as PostIdBrand, UserId as UserIdBrand } from "@bdx/ids";
 
 export interface PostInput {
-  id: bigint;
-  authorId: bigint;
+  id: PostId;
+  authorId: UserId;
   postedAt: Date;
   text: string | null;
   lang: string | null;
@@ -17,14 +19,14 @@ export interface PostInput {
 }
 
 export interface PostsMetaInput {
-  postId: bigint;
-  ingestEventId: bigint;
+  postId: PostId;
+  ingestEventId: IngestEventId;
   updatedAt: Date;
 }
 
 export interface PostSummaryRow {
-  id: bigint;
-  author_id: bigint;
+  id: PostId;
+  author_id: UserId;
   posted_at: Date;
   text: string | null;
   lang: string | null;
@@ -32,8 +34,8 @@ export interface PostSummaryRow {
 
 export async function getActivePostIdsByAuthors(
   db: DbOrTx,
-  params: { authorIds: Iterable<bigint> },
-): Promise<Set<bigint>> {
+  params: { authorIds: Iterable<UserId> },
+): Promise<Set<PostId>> {
   const ids = Array.from(new Set(params.authorIds));
   if (ids.length === 0) return new Set();
 
@@ -41,13 +43,13 @@ export async function getActivePostIdsByAuthors(
     db.selectFrom("posts").select(["id"]).where("author_id", "in", ids),
   ).execute();
 
-  return new Set(rows.map((row) => row.id));
+  return new Set(rows.map((row) => PostIdBrand(row.id)));
 }
 
 export async function upsertPosts(db: DbOrTx, rows: PostInput[]): Promise<number> {
   if (rows.length === 0) return 0;
 
-  const authorIds = new Set<bigint>();
+  const authorIds = new Set<UserId>();
   for (const row of rows) {
     authorIds.add(row.authorId);
   }
@@ -101,11 +103,14 @@ export async function upsertPostsMeta(db: DbOrTx, rows: PostsMetaInput[]): Promi
   return Number(result.numInsertedOrUpdatedRows ?? 0n);
 }
 
-export async function listPostsByAuthor(db: DbOrTx, params: {
-  authorId: bigint;
-  limit: number;
-  cursor?: CursorParams;
-}): Promise<CursorPage<PostSummaryRow>> {
+export async function listPostsByAuthor(
+  db: DbOrTx,
+  params: {
+    authorId: UserId;
+    limit: number;
+    cursor?: CursorParams;
+  },
+): Promise<CursorPage<PostSummaryRow>> {
   const query = wherePostActive(
     db
       .selectFrom("posts")
@@ -118,10 +123,19 @@ export async function listPostsByAuthor(db: DbOrTx, params: {
     { col: "posts.id", dir: "desc", output: "id" },
   ] as const;
 
-  return paginateQuery({
+  const page = await paginateQuery({
     query,
     sorts,
     limit: params.limit,
     ...(params.cursor ? { cursor: params.cursor } : {}),
   });
+
+  return {
+    ...page,
+    items: page.items.map((row) => ({
+      ...row,
+      id: PostIdBrand(row.id),
+      author_id: UserIdBrand(row.author_id),
+    })),
+  };
 }

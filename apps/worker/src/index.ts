@@ -11,6 +11,7 @@ import {
 import { AssetEngine, runEngineLoop } from "@bdx/engine";
 import { createLogger } from "@bdx/observability";
 import { TwitterApiClient } from "@bdx/twitterapi-io";
+import { WorkerId, WorkerServiceName } from "@bdx/ids";
 import http from "node:http";
 import os from "node:os";
 
@@ -36,7 +37,8 @@ const twitterClient = new TwitterApiClient({
   minIntervalMs: rateLimitQpsToMinIntervalMs(env.twitterapiIo.rateLimitQps),
 });
 
-const workerId = `${os.hostname()}:${process.pid}`;
+const workerService = WorkerServiceName("worker");
+const workerId = WorkerId(`${os.hostname()}:${process.pid}`);
 const heartbeatIntervalMs = 60_000;
 let heartbeatTimer: NodeJS.Timeout | null = null;
 let healthServer: http.Server | null = null;
@@ -44,7 +46,7 @@ let retentionTimer: NodeJS.Timeout | null = null;
 
 async function recordHeartbeat() {
   await recordWorkerHeartbeat(db, {
-    service: "worker",
+    service: workerService,
     workerId,
     lastHeartbeatAt: new Date(),
   });

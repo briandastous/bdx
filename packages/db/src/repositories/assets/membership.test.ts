@@ -1,9 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import {
-  type StartedPostgreSqlContainer,
-  PostgreSqlContainer,
-} from "@testcontainers/postgresql";
+import { type StartedPostgreSqlContainer, PostgreSqlContainer } from "@testcontainers/postgresql";
 import { createDb, destroyDb, migrateToLatest, type Db } from "../../index.js";
+import { UserId } from "@bdx/ids";
 import { ensureUsers } from "../users.js";
 import { getOrCreateAssetParams } from "./params.js";
 import { getOrCreateAssetInstance } from "./instances.js";
@@ -66,7 +64,10 @@ describe("segment membership as-of reads", () => {
   });
 
   it("rewinds membership snapshots by toggling enter/exit events", async () => {
-    await ensureUsers(db, [101n, 102n, 103n]);
+    const user101 = UserId(101n);
+    const user102 = UserId(102n);
+    const user103 = UserId(103n);
+    await ensureUsers(db, [user101, user102, user103]);
 
     const params = await getOrCreateAssetParams(db, {
       assetSlug: "segment_specified_users",
@@ -91,11 +92,11 @@ describe("segment membership as-of reads", () => {
       triggerReason: "test",
     });
     await insertSegmentEvents(db, mat1.id, [
-      { userId: 101n, eventType: "enter", isFirstAppearance: true },
+      { userId: user101, eventType: "enter", isFirstAppearance: true },
     ]);
     await expect(
       insertSegmentEvents(db, mat1.id, [
-        { userId: 101n, eventType: "enter", isFirstAppearance: true },
+        { userId: user101, eventType: "enter", isFirstAppearance: true },
       ]),
     ).rejects.toThrow();
     await updateAssetMaterialization(db, mat1.id, {
@@ -107,7 +108,7 @@ describe("segment membership as-of reads", () => {
     await replaceSegmentMembershipSnapshot(db, {
       instanceId: instance.id,
       materializationId: mat1.id,
-      userIds: [101n],
+      userIds: [user101],
     });
 
     const mat2 = await createAssetMaterialization(db, {
@@ -120,7 +121,7 @@ describe("segment membership as-of reads", () => {
       triggerReason: "test",
     });
     await insertSegmentEvents(db, mat2.id, [
-      { userId: 102n, eventType: "enter", isFirstAppearance: true },
+      { userId: user102, eventType: "enter", isFirstAppearance: true },
     ]);
     await updateAssetMaterialization(db, mat2.id, {
       status: "success",
@@ -131,7 +132,7 @@ describe("segment membership as-of reads", () => {
     await replaceSegmentMembershipSnapshot(db, {
       instanceId: instance.id,
       materializationId: mat2.id,
-      userIds: [101n, 102n],
+      userIds: [user101, user102],
     });
 
     const mat3 = await createAssetMaterialization(db, {
@@ -144,8 +145,8 @@ describe("segment membership as-of reads", () => {
       triggerReason: "test",
     });
     await insertSegmentEvents(db, mat3.id, [
-      { userId: 101n, eventType: "exit", isFirstAppearance: null },
-      { userId: 103n, eventType: "enter", isFirstAppearance: true },
+      { userId: user101, eventType: "exit", isFirstAppearance: null },
+      { userId: user103, eventType: "enter", isFirstAppearance: true },
     ]);
     await updateAssetMaterialization(db, mat3.id, {
       status: "success",
@@ -156,25 +157,25 @@ describe("segment membership as-of reads", () => {
     await replaceSegmentMembershipSnapshot(db, {
       instanceId: instance.id,
       materializationId: mat3.id,
-      userIds: [102n, 103n],
+      userIds: [user102, user103],
     });
 
     const membershipAtMat2 = await getSegmentMembershipAsOf(db, {
       instanceId: instance.id,
       targetMaterializationId: mat2.id,
     });
-    expect(membershipAtMat2).toEqual([101n, 102n]);
+    expect(membershipAtMat2).toEqual([user101, user102]);
 
     const membershipAtMat1 = await getSegmentMembershipAsOf(db, {
       instanceId: instance.id,
       targetMaterializationId: mat1.id,
     });
-    expect(membershipAtMat1).toEqual([101n]);
+    expect(membershipAtMat1).toEqual([user101]);
 
     const membershipAtMat3 = await getSegmentMembershipAsOf(db, {
       instanceId: instance.id,
       targetMaterializationId: mat3.id,
     });
-    expect(membershipAtMat3).toEqual([102n, 103n]);
+    expect(membershipAtMat3).toEqual([user102, user103]);
   });
 });

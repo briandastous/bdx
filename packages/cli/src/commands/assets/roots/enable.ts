@@ -1,6 +1,7 @@
 import { Command, Flags } from "@oclif/core";
 import { loadBaseEnv } from "@bdx/config";
 import { enableAssetInstanceRoot, replaceSpecifiedUsersInputs } from "@bdx/db";
+import type { AssetInstanceId } from "@bdx/ids";
 import { createDbFromEnv, createLoggerFromEnv, destroyDbSafely } from "../../../lib/context.js";
 import {
   ensureAssetInstance,
@@ -8,7 +9,7 @@ import {
   parseAssetParamsInput,
   resolveAssetSlug,
 } from "../../../lib/assets.js";
-import { parseBigIntCsv, parsePositiveBigInt } from "../../../lib/parsers.js";
+import { parseAssetInstanceId, parseUserIdCsv } from "../../../lib/parsers.js";
 
 export default class AssetsRootsEnable extends Command {
   static override description = "Enable a root asset instance.";
@@ -35,11 +36,11 @@ export default class AssetsRootsEnable extends Command {
     const db = createDbFromEnv(env);
 
     try {
-      let instanceId: bigint;
+      let instanceId: AssetInstanceId;
       let paramsLabel: string | null = null;
 
       if (flags["instance-id"]) {
-        instanceId = parsePositiveBigInt(flags["instance-id"], "instance-id");
+        instanceId = parseAssetInstanceId(flags["instance-id"], "instance-id");
       } else {
         if (!flags.slug || !flags.params) {
           this.error("slug and params are required when instance-id is not provided", { exit: 2 });
@@ -54,7 +55,7 @@ export default class AssetsRootsEnable extends Command {
           if (params.assetSlug !== "segment_specified_users") {
             this.error("specified-user-ids is only valid for segment_specified_users", { exit: 2 });
           }
-          const ids = parseBigIntCsv(flags["specified-user-ids"], "specified-user-ids");
+          const ids = parseUserIdCsv(flags["specified-user-ids"], "specified-user-ids");
           await replaceSpecifiedUsersInputs(db, { instanceId, userExternalIds: ids });
         }
       }

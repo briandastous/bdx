@@ -1,4 +1,7 @@
+import { expectTypeOf } from "expect-type";
 import { describe, expect, it } from "vitest";
+import type { UserId } from "@bdx/ids";
+import { UserId as UserIdBrand } from "@bdx/ids";
 import { formatAssetParams, paramsHashV1, parseAssetParams } from "./params.js";
 
 describe("parseAssetParams", () => {
@@ -17,7 +20,8 @@ describe("parseAssetParams", () => {
     if (params.assetSlug !== "segment_followers") {
       throw new Error("Expected segment_followers params");
     }
-    expect(params.subjectExternalId).toBe(42n);
+    expectTypeOf(params.subjectExternalId).toEqualTypeOf<UserId>();
+    expect(params.subjectExternalId).toBe(UserIdBrand(42n));
     expect(params.fanoutSourceParamsHash).toBeNull();
   });
 
@@ -37,7 +41,8 @@ describe("parseAssetParams", () => {
     if (sourceSegment.assetSlug !== "segment_followed") {
       throw new Error("Expected segment_followed source segment");
     }
-    expect(sourceSegment.subjectExternalId).toBe(99n);
+    expectTypeOf(sourceSegment.subjectExternalId).toEqualTypeOf<UserId>();
+    expect(sourceSegment.subjectExternalId).toBe(UserIdBrand(99n));
     expect(params.fanoutSourceParamsHash).toBeNull();
   });
 });
@@ -46,17 +51,17 @@ describe("paramsHashV1", () => {
   it("is stable for identical params and sensitive to fanout", () => {
     const base = {
       assetSlug: "segment_followers",
-      subjectExternalId: 123n,
+      subjectExternalId: UserIdBrand(123n),
       fanoutSourceParamsHash: null,
     } as const;
     const same = {
       assetSlug: "segment_followers",
-      subjectExternalId: 123n,
+      subjectExternalId: UserIdBrand(123n),
       fanoutSourceParamsHash: null,
     } as const;
     const withFanout = {
       assetSlug: "segment_followers",
-      subjectExternalId: 123n,
+      subjectExternalId: UserIdBrand(123n),
       fanoutSourceParamsHash: "hash-1",
     } as const;
 

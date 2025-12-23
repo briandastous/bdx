@@ -1,8 +1,9 @@
 import type { DbOrTx } from "../db.js";
+import type { WorkerId, WorkerServiceName } from "@bdx/ids";
 
 export async function recordWorkerHeartbeat(
   db: DbOrTx,
-  params: { service: string; workerId: string; lastHeartbeatAt: Date },
+  params: { service: WorkerServiceName; workerId: WorkerId; lastHeartbeatAt: Date },
 ): Promise<void> {
   await db
     .insertInto("worker_heartbeats")

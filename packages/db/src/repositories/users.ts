@@ -1,10 +1,11 @@
 import { sql } from "kysely";
+import type { IngestEventId, UserId } from "@bdx/ids";
 import type { DbOrTx } from "../db.js";
 import type { IngestKind, JsonValue } from "../database.js";
 import { withTransaction } from "../transactions.js";
 
 export interface UserProfileInput {
-  id: bigint;
+  id: UserId;
   handle: string | null;
   displayName: string | null;
   profileUrl: string | null;
@@ -31,27 +32,27 @@ export interface UserProfileInput {
   affiliatesHighlightedLabel: JsonValue | null;
   pinnedTweetIds: string[] | null;
   withheldCountries: string[] | null;
-  ingestEventId: bigint;
+  ingestEventId: IngestEventId;
   ingestKind: IngestKind;
   updatedAt: Date;
 }
 
 export interface UsersMetaInput {
-  userId: bigint;
-  ingestEventId: bigint;
+  userId: UserId;
+  ingestEventId: IngestEventId;
   ingestKind: IngestKind;
   updatedAt: Date;
 }
 
 export interface UserHandleInput {
-  userId: bigint;
+  userId: UserId;
   handle: string;
-  ingestEventId: bigint;
+  ingestEventId: IngestEventId;
   ingestKind: IngestKind;
   updatedAt: Date;
 }
 
-export async function ensureUser(db: DbOrTx, params: { id: bigint }): Promise<void> {
+export async function ensureUser(db: DbOrTx, params: { id: UserId }): Promise<void> {
   await db
     .insertInto("users")
     .values({
@@ -62,7 +63,7 @@ export async function ensureUser(db: DbOrTx, params: { id: bigint }): Promise<vo
     .execute();
 }
 
-export async function ensureUsers(db: DbOrTx, ids: bigint[]): Promise<number> {
+export async function ensureUsers(db: DbOrTx, ids: UserId[]): Promise<number> {
   if (ids.length === 0) return 0;
 
   const values = ids.map((id) => ({ id, is_deleted: false }));
@@ -312,7 +313,7 @@ export async function upsertUsersMeta(db: DbOrTx, rows: UsersMetaInput[]): Promi
   return Number(result.numInsertedOrUpdatedRows ?? 0n);
 }
 
-export async function markUsersSoftDeleted(db: DbOrTx, userIds: bigint[]): Promise<number> {
+export async function markUsersSoftDeleted(db: DbOrTx, userIds: UserId[]): Promise<number> {
   if (userIds.length === 0) return 0;
 
   const result = await db

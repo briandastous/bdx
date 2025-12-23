@@ -23,6 +23,9 @@ importers:
       eslint-config-prettier:
         specifier: ^10.0.1
         version: 10.1.8(eslint@9.39.2)
+      expect-type:
+        specifier: ^1.3.0
+        version: 1.3.0
       husky:
         specifier: ^9.1.7
         version: 9.1.7
@@ -59,6 +62,9 @@ importers:
       '@bdx/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@bdx/ids':
+        specifier: workspace:*
+        version: link:../../packages/ids
       '@bdx/ingest':
         specifier: workspace:*
         version: link:../../packages/ingest
@@ -86,6 +92,9 @@ importers:
       '@bdx/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@bdx/ids':
+        specifier: workspace:*
+        version: link:../../packages/ids
       '@bdx/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -104,6 +113,9 @@ importers:
       '@bdx/engine':
         specifier: workspace:*
         version: link:../engine
+      '@bdx/ids':
+        specifier: workspace:*
+        version: link:../ids
       '@bdx/ingest':
         specifier: workspace:*
         version: link:../ingest
@@ -119,6 +131,9 @@ importers:
 
   packages/config:
     dependencies:
+      '@bdx/ids':
+        specifier: workspace:*
+        version: link:../ids
       yaml:
         specifier: ^2.8.1
         version: 2.8.2
@@ -128,6 +143,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@bdx/ids':
+        specifier: workspace:*
+        version: link:../ids
       kysely:
         specifier: ^0.28.7
         version: 0.28.9
@@ -146,6 +164,9 @@ importers:
       '@bdx/db':
         specifier: workspace:*
         version: link:../db
+      '@bdx/ids':
+        specifier: workspace:*
+        version: link:../ids
       '@bdx/ingest':
         specifier: workspace:*
         version: link:../ingest
@@ -159,11 +180,16 @@ importers:
         specifier: ^3.24.1
         version: 3.25.76
 
+  packages/ids: {}
+
   packages/ingest:
     dependencies:
       '@bdx/db':
         specifier: workspace:*
         version: link:../db
+      '@bdx/ids':
+        specifier: workspace:*
+        version: link:../ids
       '@bdx/observability':
         specifier: workspace:*
         version: link:../observability
@@ -179,6 +205,9 @@ importers:
 
   packages/twitterapi-io:
     dependencies:
+      '@bdx/ids':
+        specifier: workspace:*
+        version: link:../ids
       '@bdx/twitterapi-io-types':
         specifier: workspace:*
         version: link:../twitterapi-io-types

@@ -1,16 +1,26 @@
 import type { DbOrTx } from "../db.js";
+import type {
+  PlannerRunId,
+  SchedulerJobId,
+  SchedulerPlannerEventId,
+  SchedulerTargetId,
+} from "@bdx/ids";
+import { SchedulerPlannerEventId as SchedulerPlannerEventIdBrand } from "@bdx/ids";
 
 export interface PlannerEventInput {
-  jobId: string;
-  targetId: string | null;
+  jobId: SchedulerJobId;
+  targetId: SchedulerTargetId | null;
   targetParams: string | null;
   decision: string;
   reason?: string | null;
   plannedFor?: Date | null;
-  plannerRunId?: string | null;
+  plannerRunId?: PlannerRunId | null;
 }
 
-export async function recordPlannerEvent(db: DbOrTx, input: PlannerEventInput): Promise<bigint> {
+export async function recordPlannerEvent(
+  db: DbOrTx,
+  input: PlannerEventInput,
+): Promise<SchedulerPlannerEventId> {
   const row = await db
     .insertInto("scheduler_planner_events")
     .values({
@@ -25,5 +35,5 @@ export async function recordPlannerEvent(db: DbOrTx, input: PlannerEventInput): 
     .returning(["id"])
     .executeTakeFirstOrThrow();
 
-  return row.id;
+  return SchedulerPlannerEventIdBrand(row.id);
 }

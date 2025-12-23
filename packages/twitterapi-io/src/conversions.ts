@@ -6,6 +6,7 @@ import type {
   UserInfoData,
 } from "./api_types.js";
 import type { JsonObject, JsonValue, TweetData, XUserData } from "./types.js";
+import { PostId, UserId } from "@bdx/ids";
 
 function isRecord(value: unknown): value is Record<string, JsonValue> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -40,6 +41,16 @@ function toBigInt(value: unknown): bigint | null {
   return null;
 }
 
+function toUserId(value: unknown): UserId | null {
+  const id = toBigInt(value);
+  return id ? UserId(id) : null;
+}
+
+function toPostId(value: unknown): PostId | null {
+  const id = toBigInt(value);
+  return id ? PostId(id) : null;
+}
+
 function toStringArray(value: unknown): string[] | null {
   if (!Array.isArray(value)) return null;
   const filtered = value.filter((item): item is string => typeof item === "string");
@@ -62,7 +73,7 @@ export function convertUser(
   );
 
   return {
-    userId: toBigInt(item.id),
+    userId: toUserId(item.id),
     userName: toString(item.userName),
     displayName: toString(item.name),
     profileUrl: toString(item.url),
@@ -93,8 +104,8 @@ export function convertUser(
 }
 
 export function convertTweet(item: TweetItem): TweetData | null {
-  const tweetId = toBigInt(item.id);
-  const authorId = toBigInt(item.author?.id);
+  const tweetId = toPostId(item.id);
+  const authorId = toUserId(item.author?.id);
   if (!tweetId || !authorId) return null;
 
   const createdAt = parseDate(item.createdAt) ?? new Date();

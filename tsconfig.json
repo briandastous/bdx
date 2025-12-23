@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "packages/config" },
+    { "path": "packages/ids" },
     { "path": "packages/observability" },
     { "path": "packages/db" },
     { "path": "packages/twitterapi-io-types" },

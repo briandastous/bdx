@@ -11,6 +11,7 @@
     "@bdx/config": "workspace:*",
     "@bdx/db": "workspace:*",
     "@bdx/ingest": "workspace:*",
+    "@bdx/ids": "workspace:*",
     "@bdx/observability": "workspace:*",
     "@bdx/twitterapi-io": "workspace:*",
     "@asteasolutions/zod-to-openapi": "^7.3.4",

@@ -12,6 +12,7 @@ import {
   TwitterApiTransportError,
   TwitterApiUnexpectedResponseError,
 } from "./errors.js";
+import type { UserId } from "@bdx/ids";
 import { chooseCursor, chooseHasNext } from "./pagination.js";
 import { configureRateLimit, enforceRateLimit } from "./rate_limit.js";
 import type {
@@ -66,7 +67,7 @@ export class TwitterApiClient {
     return convertUser(data);
   }
 
-  async fetchUserProfileById(userId: bigint): Promise<XUserData | null> {
+  async fetchUserProfileById(userId: UserId): Promise<XUserData | null> {
     const { json } = await this.requestJson("/twitter/user/batch_info_by_ids", {
       userIds: userId.toString(),
     });

@@ -2,16 +2,18 @@ import { sql } from "kysely";
 import type { DbOrTx } from "../db.js";
 import type { IngestKind } from "../database.js";
 import { ensureUsers } from "./users.js";
+import type { IngestEventId, UserId } from "@bdx/ids";
+import { UserId as UserIdBrand } from "@bdx/ids";
 
 export interface FollowEdgeInput {
-  targetId: bigint;
-  followerId: bigint;
+  targetId: UserId;
+  followerId: UserId;
 }
 
 export interface FollowsMetaInput {
-  targetId: bigint;
-  followerId: bigint;
-  ingestEventId: bigint;
+  targetId: UserId;
+  followerId: UserId;
+  ingestEventId: IngestEventId;
   ingestKind: IngestKind;
   updatedAt: Date;
 }
@@ -19,7 +21,7 @@ export interface FollowsMetaInput {
 export async function upsertFollows(db: DbOrTx, rows: FollowEdgeInput[]): Promise<number> {
   if (rows.length === 0) return 0;
 
-  const userIds = new Set<bigint>();
+  const userIds = new Set<UserId>();
   for (const row of rows) {
     userIds.add(row.targetId);
     userIds.add(row.followerId);
@@ -68,8 +70,8 @@ export async function upsertFollowsMeta(db: DbOrTx, rows: FollowsMetaInput[]): P
 
 export async function getActiveFollowerIds(
   db: DbOrTx,
-  params: { targetUserId: bigint },
-): Promise<Set<bigint>> {
+  params: { targetUserId: UserId },
+): Promise<Set<UserId>> {
   const rows = await db
     .selectFrom("follows")
     .select(["follower_id"])
@@ -77,13 +79,13 @@ export async function getActiveFollowerIds(
     .where("is_deleted", "=", false)
     .execute();
 
-  return new Set(rows.map((row) => row.follower_id));
+  return new Set(rows.map((row) => UserIdBrand(row.follower_id)));
 }
 
 export async function getActiveFollowedIds(
   db: DbOrTx,
-  params: { followerUserId: bigint },
-): Promise<Set<bigint>> {
+  params: { followerUserId: UserId },
+): Promise<Set<UserId>> {
   const rows = await db
     .selectFrom("follows")
     .select(["target_id"])
@@ -91,12 +93,12 @@ export async function getActiveFollowedIds(
     .where("is_deleted", "=", false)
     .execute();
 
-  return new Set(rows.map((row) => row.target_id));
+  return new Set(rows.map((row) => UserIdBrand(row.target_id)));
 }
 
 export async function markFollowersSoftDeleted(
   db: DbOrTx,
-  params: { targetUserId: bigint; activeFollowerIds: Iterable<bigint> },
+  params: { targetUserId: UserId; activeFollowerIds: Iterable<UserId> },
 ): Promise<number> {
   const activeSet = new Set(params.activeFollowerIds);
   const existing = await getActiveFollowerIds(db, { targetUserId: params.targetUserId });
@@ -116,7 +118,7 @@ export async function markFollowersSoftDeleted(
 
 export async function markFollowingsSoftDeleted(
   db: DbOrTx,
-  params: { followerUserId: bigint; activeFollowedIds: Iterable<bigint> },
+  params: { followerUserId: UserId; activeFollowedIds: Iterable<UserId> },
 ): Promise<number> {
   const activeSet = new Set(params.activeFollowedIds);
   const existing = await getActiveFollowedIds(db, { followerUserId: params.followerUserId });

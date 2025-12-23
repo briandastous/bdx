@@ -1,4 +1,5 @@
 import type { AssetSlug } from "@bdx/db";
+import { UserId, parseUserId } from "@bdx/ids";
 import { z } from "zod";
 import { HASH_VERSION_V1, hashPartsV1 } from "../hashing.js";
 
@@ -14,7 +15,7 @@ export type SubjectSegmentParams = {
     | "segment_followed"
     | "segment_mutuals"
     | "segment_unreciprocated_followed";
-  subjectExternalId: bigint;
+  subjectExternalId: UserId;
   fanoutSourceParamsHash: string | null;
 };
 
@@ -30,14 +31,10 @@ export type AssetParams = SegmentParams | PostCorpusForSegmentParams;
 
 export const PARAMS_HASH_VERSION = HASH_VERSION_V1;
 
-const bigintSchema = z.union([z.string(), z.number().int(), z.bigint()]).transform((value) => {
-  if (typeof value === "bigint") return value;
-  if (typeof value === "number") return BigInt(value);
-  const trimmed = value.trim();
-  if (trimmed.length === 0) {
-    throw new Error("Expected bigint string");
-  }
-  return BigInt(trimmed);
+const userIdSchema = z.union([z.string(), z.number().int(), z.bigint()]).transform((value) => {
+  if (typeof value === "bigint") return UserId(value);
+  if (typeof value === "number") return UserId(BigInt(value));
+  return parseUserId(value);
 });
 
 const fanoutSchema = z.object({
@@ -59,7 +56,7 @@ const subjectSegmentInputSchema = z
       "segment_mutuals",
       "segment_unreciprocated_followed",
     ]),
-    subjectExternalId: bigintSchema,
+    subjectExternalId: userIdSchema,
   })
   .merge(fanoutSchema);
 

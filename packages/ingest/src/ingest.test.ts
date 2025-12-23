@@ -4,6 +4,7 @@ import { type StartedPostgreSqlContainer, PostgreSqlContainer } from "@testconta
 import { createDb, destroyDb, migrateToLatest, upsertFollows, type Db } from "@bdx/db";
 import { createLogger } from "@bdx/observability";
 import { TwitterApiClient, type JsonValue } from "@bdx/twitterapi-io";
+import { PostId, UserId } from "@bdx/ids";
 import { FollowersSyncService } from "./followers.js";
 import { FollowingsSyncService } from "./followings.js";
 import { PostsSyncService } from "./posts.js";
@@ -136,9 +137,12 @@ describe("ingest services", () => {
   });
 
   it("soft deletes missing followers on full refresh", async () => {
+    const targetUserId = UserId(1n);
+    const followerId = UserId(10n);
+    const missingFollowerId = UserId(20n);
     await upsertFollows(db, [
-      { targetId: 1n, followerId: 10n },
-      { targetId: 1n, followerId: 20n },
+      { targetId: targetUserId, followerId },
+      { targetId: targetUserId, followerId: missingFollowerId },
     ]);
 
     const client = createClientWithFixtures([
@@ -157,18 +161,18 @@ describe("ingest services", () => {
 
     const logger = createLogger({ env: "test", level: "silent", service: "ingest-test" });
     const service = new FollowersSyncService({ db, logger, client });
-    const result = await service.syncFollowersFull({ targetUserId: 1n });
+    const result = await service.syncFollowersFull({ targetUserId });
 
     const rows = await db
       .selectFrom("follows")
       .select(["follower_id", "is_deleted"])
-      .where("target_id", "=", 1n)
+      .where("target_id", "=", targetUserId)
       .orderBy("follower_id", "asc")
       .execute();
 
     expect(rows).toEqual([
-      { follower_id: 10n, is_deleted: false },
-      { follower_id: 20n, is_deleted: true },
+      { follower_id: followerId, is_deleted: false },
+      { follower_id: missingFollowerId, is_deleted: true },
     ]);
 
     const run = await db
@@ -196,7 +200,7 @@ describe("ingest services", () => {
       .orderBy("follower_id", "asc")
       .execute();
     expect(followMeta).toEqual([
-      { target_id: 1n, follower_id: 10n, ingest_event_id: result.syncRunId },
+      { target_id: targetUserId, follower_id: followerId, ingest_event_id: result.syncRunId },
     ]);
 
     const userMeta = await db
@@ -205,12 +209,13 @@ describe("ingest services", () => {
       .orderBy("user_id", "asc")
       .execute();
     expect(userMeta).toEqual([
-      { user_id: 1n, ingest_event_id: result.syncRunId },
-      { user_id: 10n, ingest_event_id: result.syncRunId },
+      { user_id: targetUserId, ingest_event_id: result.syncRunId },
+      { user_id: followerId, ingest_event_id: result.syncRunId },
     ]);
   });
 
   it("records truncated http response bodies on failures", async () => {
+    const targetUserId = UserId(1n);
     const largePayload = { error: "x".repeat(5000) };
     const client = createClientWithFixtures([
       {
@@ -232,7 +237,7 @@ describe("ingest services", () => {
       httpSnapshotMaxBytes: 64,
     });
 
-    await expect(service.syncFollowersFull({ targetUserId: 1n })).rejects.toThrow();
+    await expect(service.syncFollowersFull({ targetUserId })).rejects.toThrow();
 
     const run = await db
       .selectFrom("followers_sync_runs")
@@ -253,9 +258,12 @@ describe("ingest services", () => {
   });
 
   it("does not soft delete missing followings on incremental sync", async () => {
+    const sourceUserId = UserId(1n);
+    const followedId = UserId(10n);
+    const missingFollowedId = UserId(20n);
     await upsertFollows(db, [
-      { targetId: 10n, followerId: 1n },
-      { targetId: 20n, followerId: 1n },
+      { targetId: followedId, followerId: sourceUserId },
+      { targetId: missingFollowedId, followerId: sourceUserId },
     ]);
 
     const client = createClientWithFixtures([
@@ -274,18 +282,18 @@ describe("ingest services", () => {
 
     const logger = createLogger({ env: "test", level: "silent", service: "ingest-test" });
     const service = new FollowingsSyncService({ db, logger, client });
-    const result = await service.syncFollowingsIncremental({ sourceUserId: 1n });
+    const result = await service.syncFollowingsIncremental({ sourceUserId });
 
     const rows = await db
       .selectFrom("follows")
       .select(["target_id", "is_deleted"])
-      .where("follower_id", "=", 1n)
+      .where("follower_id", "=", sourceUserId)
       .orderBy("target_id", "asc")
       .execute();
 
     expect(rows).toEqual([
-      { target_id: 10n, is_deleted: false },
-      { target_id: 20n, is_deleted: false },
+      { target_id: followedId, is_deleted: false },
+      { target_id: missingFollowedId, is_deleted: false },
     ]);
 
     const run = await db
@@ -305,7 +313,7 @@ describe("ingest services", () => {
       .orderBy("follower_id", "asc")
       .execute();
     expect(followMeta).toEqual([
-      { target_id: 10n, follower_id: 1n, ingest_event_id: result.syncRunId },
+      { target_id: followedId, follower_id: sourceUserId, ingest_event_id: result.syncRunId },
     ]);
 
     const userMeta = await db
@@ -314,12 +322,13 @@ describe("ingest services", () => {
       .orderBy("user_id", "asc")
       .execute();
     expect(userMeta).toEqual([
-      { user_id: 1n, ingest_event_id: result.syncRunId },
-      { user_id: 10n, ingest_event_id: result.syncRunId },
+      { user_id: sourceUserId, ingest_event_id: result.syncRunId },
+      { user_id: followedId, ingest_event_id: result.syncRunId },
     ]);
   });
 
   it("emits structured logs for ingest runs", async () => {
+    const targetUserId = UserId(1n);
     const client = createClientWithFixtures([
       {
         path: "/twitter/user/batch_info_by_ids",
@@ -337,7 +346,7 @@ describe("ingest services", () => {
     const output = captureStdout();
     const logger = createLogger({ env: "test", level: "info", service: "ingest-test" });
     const service = new FollowersSyncService({ db, logger, client });
-    await service.syncFollowersFull({ targetUserId: 1n });
+    await service.syncFollowersFull({ targetUserId });
 
     await new Promise((resolve) => setImmediate(resolve));
     output.restore();
@@ -353,6 +362,8 @@ describe("ingest services", () => {
   });
 
   it("writes posts and run metadata using mocked twitter responses", async () => {
+    const authorUserId = UserId(1n);
+    const postId = PostId(500n);
     const client = createClientWithFixtures([
       {
         path: "/twitter/user/batch_info_by_ids",
@@ -382,7 +393,7 @@ describe("ingest services", () => {
       maxQueryLength: 1024,
     });
 
-    const result = await service.syncPostsFull({ userIds: [1n] });
+    const result = await service.syncPostsFull({ userIds: [authorUserId] });
 
     const posts = await db
       .selectFrom("posts")
@@ -390,8 +401,8 @@ describe("ingest services", () => {
       .orderBy("id", "asc")
       .execute();
 
-    expect(posts).toEqual([{ id: 500n, author_id: 1n }]);
-    expect(result.postIds).toEqual([500n]);
+    expect(posts).toEqual([{ id: postId, author_id: authorUserId }]);
+    expect(result.postIds).toEqual([postId]);
 
     const run = await db
       .selectFrom("posts_sync_runs")
@@ -416,13 +427,13 @@ describe("ingest services", () => {
       .select(["post_id", "ingest_event_id"])
       .orderBy("post_id", "asc")
       .execute();
-    expect(postMeta).toEqual([{ post_id: 500n, ingest_event_id: result.syncRunId }]);
+    expect(postMeta).toEqual([{ post_id: postId, ingest_event_id: result.syncRunId }]);
 
     const userMeta = await db
       .selectFrom("users_meta")
       .select(["user_id", "ingest_event_id"])
       .orderBy("user_id", "asc")
       .execute();
-    expect(userMeta).toEqual([{ user_id: 1n, ingest_event_id: result.syncRunId }]);
+    expect(userMeta).toEqual([{ user_id: authorUserId, ingest_event_id: result.syncRunId }]);
   });
 });

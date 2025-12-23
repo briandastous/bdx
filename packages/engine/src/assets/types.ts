@@ -1,9 +1,11 @@
 import type { AssetSlug, IngestKind } from "@bdx/db";
 import type { Logger } from "@bdx/observability";
 import type { DbOrTx } from "@bdx/db";
+import type { AssetInstanceId, AssetMaterializationId, PostId, UserId } from "@bdx/ids";
 import type { AssetParams } from "./params.js";
 
 export type AssetItemKind = "user" | "post";
+export type AssetItemId = UserId | PostId;
 
 export type Awaitable<T> = T | Promise<T>;
 
@@ -16,30 +18,30 @@ export interface DependencySpec {
 export interface ResolvedDependency {
   name: string;
   assetSlug: AssetSlug;
-  instanceId: bigint;
+  instanceId: AssetInstanceId;
   params: AssetParams;
   paramsHash: string;
   paramsHashVersion: number;
-  materializationId: bigint;
+  materializationId: AssetMaterializationId;
   outputRevision: bigint;
 }
 
 export interface IngestRequirement {
   ingestKind: IngestKind;
-  targetUserId: bigint;
+  targetUserId: UserId;
   freshnessMs: number | null;
-  requestedByMaterializationIds?: bigint[];
+  requestedByMaterializationIds?: AssetMaterializationId[];
 }
 
 export interface MaterializationContext {
   db: DbOrTx;
   logger: Logger;
-  instanceId: bigint;
+  instanceId: AssetInstanceId;
   assetSlug: AssetSlug;
   params: AssetParams;
   inputsHash: string;
   dependencyRevisionsHash: string;
   dependencies: ResolvedDependency[];
-  requestedByMaterializationIds: bigint[];
+  requestedByMaterializationIds: AssetMaterializationId[];
   triggerReason: string | null;
 }

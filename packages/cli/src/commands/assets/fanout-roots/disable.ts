@@ -2,13 +2,14 @@ import { Command, Flags } from "@oclif/core";
 import { loadBaseEnv } from "@bdx/config";
 import { disableAssetInstanceFanoutRoot } from "@bdx/db";
 import type { AssetInstanceFanoutMode } from "@bdx/db";
+import type { AssetInstanceId } from "@bdx/ids";
 import { createDbFromEnv, createLoggerFromEnv, destroyDbSafely } from "../../../lib/context.js";
 import {
   getAssetInstanceForParams,
   parseAssetParamsInput,
   resolveAssetSlug,
 } from "../../../lib/assets.js";
-import { parsePositiveBigInt } from "../../../lib/parsers.js";
+import { parseAssetInstanceId } from "../../../lib/parsers.js";
 
 const fanoutModes: readonly AssetInstanceFanoutMode[] = ["global_per_item", "scoped_by_source"];
 
@@ -43,14 +44,17 @@ export default class AssetsFanoutRootsDisable extends Command {
     const db = createDbFromEnv(env);
 
     try {
-      let sourceInstanceId: bigint;
+      let sourceInstanceId: AssetInstanceId;
       if (flags["source-instance-id"]) {
-        sourceInstanceId = parsePositiveBigInt(flags["source-instance-id"], "source-instance-id");
+        sourceInstanceId = parseAssetInstanceId(flags["source-instance-id"], "source-instance-id");
       } else {
         if (!flags["source-slug"] || !flags["source-params"]) {
-          this.error("source-slug and source-params are required when source-instance-id is not provided", {
-            exit: 2,
-          });
+          this.error(
+            "source-slug and source-params are required when source-instance-id is not provided",
+            {
+              exit: 2,
+            },
+          );
         }
         const sourceSlug = resolveAssetSlug(flags["source-slug"]);
         const sourceParams = parseAssetParamsInput(sourceSlug, flags["source-params"]);

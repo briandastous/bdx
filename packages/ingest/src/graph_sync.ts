@@ -21,6 +21,7 @@ import type {
   TwitterApiClient,
   XUserData,
 } from "@bdx/twitterapi-io";
+import type { IngestEventId, UserId } from "@bdx/ids";
 import { sanitizeHttpExchange } from "./http_snapshot.js";
 
 export interface CounterpartMetadata {
@@ -33,20 +34,20 @@ export interface CounterpartMetadata {
 export interface CounterpartMetadataWithSync {
   counterpartMetadata: CounterpartMetadata;
   syncedAt: Date;
-  syncRunId: bigint;
+  syncRunId: IngestEventId;
 }
 
 export interface SyncedCounterpart {
-  userId: bigint;
+  userId: UserId;
   metadata: CounterpartMetadataWithSync;
 }
 
 export interface GraphSyncState {
-  primaryUserId: bigint;
+  primaryUserId: UserId;
   primaryHandle: string;
-  counterparts: SyncedCounterpart[];
+  counterparts: readonly SyncedCounterpart[];
   counterpartCount: number;
-  syncRunId: bigint;
+  syncRunId: IngestEventId;
   cursorExhausted: boolean;
 }
 
@@ -60,11 +61,11 @@ export interface GraphSyncOrientation {
   primaryIsTarget: boolean;
   createRun: (
     db: Db,
-    params: { primaryUserId: bigint; syncMode: FollowsSyncMode },
+    params: { primaryUserId: UserId; syncMode: FollowsSyncMode },
   ) => Promise<IngestEventRecord>;
-  updateRun: (db: Db, ingestEventId: bigint, input: SyncRunUpdateInput) => Promise<number>;
-  existingIds: (db: Db, primaryUserId: bigint) => Promise<Set<bigint>>;
-  softDelete: (db: Db, primaryUserId: bigint, activeIds: Iterable<bigint>) => Promise<number>;
+  updateRun: (db: Db, ingestEventId: IngestEventId, input: SyncRunUpdateInput) => Promise<number>;
+  existingIds: (db: Db, primaryUserId: UserId) => Promise<Set<UserId>>;
+  softDelete: (db: Db, primaryUserId: UserId, activeIds: Iterable<UserId>) => Promise<number>;
 }
 
 export class GraphSyncError extends Error {
@@ -93,7 +94,7 @@ export class GraphSyncRateLimitError extends GraphSyncError {
 
 export function userProfileInputFromXUser(params: {
   user: XUserData;
-  ingestEventId: bigint;
+  ingestEventId: IngestEventId;
   ingestKind: IngestKind;
   updatedAt: Date;
 }): { profile: UserProfileInput | null; metadata: CounterpartMetadata | null } {
@@ -164,12 +165,12 @@ export abstract class BaseGraphSyncService<PageT extends GraphSyncPage> {
     this.httpSnapshotMaxBytes = params.httpSnapshotMaxBytes;
   }
 
-  protected abstract fetchPrimaryProfile(primaryUserId: bigint): Promise<XUserData | null>;
+  protected abstract fetchPrimaryProfile(primaryUserId: UserId): Promise<XUserData | null>;
   protected abstract fetchPage(handle: string, cursor: string | null): Promise<PageT>;
   protected abstract pageUsers(page: PageT): Iterable<XUserData>;
   protected abstract validatePrimaryProfile(
     primaryProfile: XUserData | null,
-    primaryUserId: bigint,
+    primaryUserId: UserId,
   ): string;
 
   protected lastHttpExchange(): {
@@ -180,17 +181,17 @@ export abstract class BaseGraphSyncService<PageT extends GraphSyncPage> {
   }
 
   protected async syncGraph(params: {
-    primaryUserId: bigint;
+    primaryUserId: UserId;
     fullRefresh: boolean;
   }): Promise<GraphSyncState> {
-    const counterpartIds = new Set<bigint>();
+    const counterpartIds = new Set<UserId>();
     const counterpartMaterializations: SyncedCounterpart[] = [];
     const allUserUpdates: UserProfileInput[] = [];
-    const allFollowEdges: { targetId: bigint; followerId: bigint }[] = [];
+    const allFollowEdges: { targetId: UserId; followerId: UserId }[] = [];
     const allFollowMetaUpdates: {
-      targetId: bigint;
-      followerId: bigint;
-      ingestEventId: bigint;
+      targetId: UserId;
+      followerId: UserId;
+      ingestEventId: IngestEventId;
       ingestKind: IngestKind;
       updatedAt: Date;
     }[] = [];
@@ -215,7 +216,7 @@ export abstract class BaseGraphSyncService<PageT extends GraphSyncPage> {
       "Starting graph sync",
     );
 
-    let existingCounterparts = new Set<bigint>();
+    let existingCounterparts = new Set<UserId>();
     if (!params.fullRefresh) {
       existingCounterparts = await this.orientation.existingIds(this.db, params.primaryUserId);
     }
@@ -381,9 +382,9 @@ export abstract class BaseGraphSyncService<PageT extends GraphSyncPage> {
   }
 
   protected relationshipIds(
-    primaryUserId: bigint,
-    counterpartUserId: bigint,
-  ): { targetId: bigint; followerId: bigint } {
+    primaryUserId: UserId,
+    counterpartUserId: UserId,
+  ): { targetId: UserId; followerId: UserId } {
     if (this.orientation.primaryIsTarget) {
       return { targetId: primaryUserId, followerId: counterpartUserId };
     }
@@ -393,19 +394,19 @@ export abstract class BaseGraphSyncService<PageT extends GraphSyncPage> {
   protected processPage(
     page: PageT,
     params: {
-      primaryUserId: bigint;
-      syncRunId: bigint;
-      counterpartIds: Set<bigint>;
+      primaryUserId: UserId;
+      syncRunId: IngestEventId;
+      counterpartIds: Set<UserId>;
       fullRefresh: boolean;
-      existingCounterparts: Set<bigint>;
+      existingCounterparts: Set<UserId>;
     },
   ): {
     userUpdates: UserProfileInput[];
-    followEdges: { targetId: bigint; followerId: bigint }[];
+    followEdges: { targetId: UserId; followerId: UserId }[];
     followMetaUpdates: {
-      targetId: bigint;
-      followerId: bigint;
-      ingestEventId: bigint;
+      targetId: UserId;
+      followerId: UserId;
+      ingestEventId: IngestEventId;
       ingestKind: IngestKind;
       updatedAt: Date;
     }[];
@@ -414,11 +415,11 @@ export abstract class BaseGraphSyncService<PageT extends GraphSyncPage> {
   } {
     const now = new Date();
     const userUpdates: UserProfileInput[] = [];
-    const followEdges: { targetId: bigint; followerId: bigint }[] = [];
+    const followEdges: { targetId: UserId; followerId: UserId }[] = [];
     const followMetaUpdates: {
-      targetId: bigint;
-      followerId: bigint;
-      ingestEventId: bigint;
+      targetId: UserId;
+      followerId: UserId;
+      ingestEventId: IngestEventId;
       ingestKind: IngestKind;
       updatedAt: Date;
     }[] = [];
@@ -479,7 +480,7 @@ export abstract class BaseGraphSyncService<PageT extends GraphSyncPage> {
     return { userUpdates, followEdges, followMetaUpdates, userMetaUpdates, materializations };
   }
 
-  private async recordFailure(syncRunId: bigint, error: unknown): Promise<void> {
+  private async recordFailure(syncRunId: IngestEventId, error: unknown): Promise<void> {
     const status = error instanceof GraphSyncError ? error.status : "exception";
     const message = error instanceof Error ? error.message : String(error);
     const completionTime = new Date();

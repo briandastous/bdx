@@ -1,9 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import {
-  type StartedPostgreSqlContainer,
-  PostgreSqlContainer,
-} from "@testcontainers/postgresql";
+import { type StartedPostgreSqlContainer, PostgreSqlContainer } from "@testcontainers/postgresql";
 import type { Db } from "../../index.js";
+import type { AssetInstanceId } from "@bdx/ids";
 import {
   createDb,
   destroyDb,
@@ -25,7 +23,7 @@ async function resetDb(db: Db): Promise<void> {
   await db.deleteFrom("asset_params").execute();
 }
 
-async function createAssetInstance(db: Db): Promise<bigint> {
+async function createAssetInstance(db: Db): Promise<AssetInstanceId> {
   const params = await getOrCreateAssetParams(db, {
     assetSlug: "segment_specified_users",
     paramsHash: "roots-test",

@@ -1,13 +1,19 @@
 import type { DbOrTx } from "../../db.js";
 import type { AssetSlug } from "../../database.js";
+import type { AssetInstanceId, AssetMaterializationId, AssetParamsId } from "@bdx/ids";
+import {
+  AssetInstanceId as AssetInstanceIdBrand,
+  AssetMaterializationId as AssetMaterializationIdBrand,
+  AssetParamsId as AssetParamsIdBrand,
+} from "@bdx/ids";
 
 export interface AssetInstanceRecord {
-  id: bigint;
-  paramsId: bigint;
+  id: AssetInstanceId;
+  paramsId: AssetParamsId;
   assetSlug: AssetSlug;
   paramsHashVersion: number;
   paramsHash: string;
-  currentMembershipMaterializationId: bigint | null;
+  currentMembershipMaterializationId: AssetMaterializationId | null;
 }
 
 function toInstanceRecord(row: {
@@ -19,18 +25,20 @@ function toInstanceRecord(row: {
   current_membership_materialization_id: bigint | null;
 }): AssetInstanceRecord {
   return {
-    id: row.id,
-    paramsId: row.params_id,
+    id: AssetInstanceIdBrand(row.id),
+    paramsId: AssetParamsIdBrand(row.params_id),
     assetSlug: row.asset_slug,
     paramsHashVersion: row.params_hash_version,
     paramsHash: row.params_hash,
-    currentMembershipMaterializationId: row.current_membership_materialization_id,
+    currentMembershipMaterializationId: row.current_membership_materialization_id
+      ? AssetMaterializationIdBrand(row.current_membership_materialization_id)
+      : null,
   };
 }
 
 export async function getAssetInstanceById(
   db: DbOrTx,
-  instanceId: bigint,
+  instanceId: AssetInstanceId,
 ): Promise<AssetInstanceRecord | null> {
   const row = await db
     .selectFrom("asset_instances")
@@ -72,7 +80,12 @@ export async function getAssetInstanceBySlugHash(
 
 export async function getOrCreateAssetInstance(
   db: DbOrTx,
-  input: { paramsId: bigint; assetSlug: AssetSlug; paramsHash: string; paramsHashVersion: number },
+  input: {
+    paramsId: AssetParamsId;
+    assetSlug: AssetSlug;
+    paramsHash: string;
+    paramsHashVersion: number;
+  },
 ): Promise<AssetInstanceRecord> {
   const inserted =
     (await db
@@ -111,7 +124,7 @@ export async function getOrCreateAssetInstance(
 
 export async function updateCurrentMembershipMaterialization(
   db: DbOrTx,
-  params: { instanceId: bigint; materializationId: bigint | null },
+  params: { instanceId: AssetInstanceId; materializationId: AssetMaterializationId | null },
 ): Promise<number> {
   const result = await db
     .updateTable("asset_instances")

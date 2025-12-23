@@ -1,6 +1,8 @@
 import type { DbOrTx } from "../../db.js";
 import type { AssetSlug } from "../../database.js";
 import { withTransaction } from "../../transactions.js";
+import type { AssetInstanceId, AssetParamsId, UserId } from "@bdx/ids";
+import { AssetParamsId as AssetParamsIdBrand, UserId as UserIdBrand } from "@bdx/ids";
 
 export type AssetParamsInput =
   | {
@@ -21,7 +23,7 @@ export type AssetParamsInput =
       paramsHashVersion: number;
       fanoutSourceParamsHash?: string | null;
       fanoutSourceParamsHashVersion?: number | null;
-      subjectExternalId: bigint;
+      subjectExternalId: UserId;
     }
   | {
       assetSlug: "post_corpus_for_segment";
@@ -29,11 +31,11 @@ export type AssetParamsInput =
       paramsHashVersion: number;
       fanoutSourceParamsHash?: string | null;
       fanoutSourceParamsHashVersion?: number | null;
-      sourceSegmentParamsId: bigint;
+      sourceSegmentParamsId: AssetParamsId;
     };
 
 type BaseAssetParamsRecord = {
-  id: bigint;
+  id: AssetParamsId;
   assetSlug: AssetSlug;
   paramsHashVersion: number;
   paramsHash: string;
@@ -56,11 +58,11 @@ export type AssetParamsRecord =
         | "segment_followed"
         | "segment_mutuals"
         | "segment_unreciprocated_followed";
-      subjectExternalId: bigint;
+      subjectExternalId: UserId;
     })
   | (BaseAssetParamsRecord & {
       assetSlug: "post_corpus_for_segment";
-      sourceSegmentParamsId: bigint;
+      sourceSegmentParamsId: AssetParamsId;
     });
 
 function normalizeFanoutSourceParamsHash(value: string | null | undefined): string | null {
@@ -78,7 +80,7 @@ function normalizeFanoutSourceParamsHashVersion(
 
 async function fetchBaseAssetParamsById(
   db: DbOrTx,
-  assetParamsId: bigint,
+  assetParamsId: AssetParamsId,
 ): Promise<BaseAssetParamsRecord | null> {
   const base = await db
     .selectFrom("asset_params")
@@ -95,7 +97,7 @@ async function fetchBaseAssetParamsById(
 
   if (!base) return null;
   return {
-    id: base.id,
+    id: AssetParamsIdBrand(base.id),
     assetSlug: base.asset_slug,
     paramsHashVersion: base.params_hash_version,
     paramsHash: base.params_hash,
@@ -125,7 +127,7 @@ async function fetchBaseAssetParamsBySlugHash(
 
   if (!base) return null;
   return {
-    id: base.id,
+    id: AssetParamsIdBrand(base.id),
     assetSlug: base.asset_slug,
     paramsHashVersion: base.params_hash_version,
     paramsHash: base.params_hash,
@@ -203,7 +205,7 @@ async function fetchSubjectSegmentParams(
   return {
     ...base,
     assetSlug: base.assetSlug,
-    subjectExternalId: row.subject_external_id,
+    subjectExternalId: UserIdBrand(row.subject_external_id),
   };
 }
 
@@ -226,13 +228,13 @@ async function fetchPostCorpusParams(
   return {
     ...base,
     assetSlug: "post_corpus_for_segment",
-    sourceSegmentParamsId: row.source_segment_params_id,
+    sourceSegmentParamsId: AssetParamsIdBrand(row.source_segment_params_id),
   };
 }
 
 export async function getAssetParamsById(
   db: DbOrTx,
-  assetParamsId: bigint,
+  assetParamsId: AssetParamsId,
 ): Promise<AssetParamsRecord | null> {
   const base = await fetchBaseAssetParamsById(db, assetParamsId);
   if (!base) return null;
@@ -266,7 +268,7 @@ export async function getAssetParamsBySlugHash(
 
 export async function getAssetParamsByInstanceId(
   db: DbOrTx,
-  instanceId: bigint,
+  instanceId: AssetInstanceId,
 ): Promise<AssetParamsRecord | null> {
   const row = await db
     .selectFrom("asset_instances")
@@ -275,7 +277,7 @@ export async function getAssetParamsByInstanceId(
     .executeTakeFirst();
 
   if (!row) return null;
-  return getAssetParamsById(db, row.params_id);
+  return getAssetParamsById(db, AssetParamsIdBrand(row.params_id));
 }
 
 export async function getOrCreateAssetParams(
@@ -327,7 +329,7 @@ export async function getOrCreateAssetParams(
         .executeTakeFirstOrThrow());
 
     const base: BaseAssetParamsRecord = {
-      id: baseRecord.id,
+      id: AssetParamsIdBrand(baseRecord.id),
       assetSlug: baseRecord.asset_slug,
       paramsHashVersion: baseRecord.params_hash_version,
       paramsHash: baseRecord.params_hash,

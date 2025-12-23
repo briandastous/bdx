@@ -1,13 +1,14 @@
 import { Command, Flags } from "@oclif/core";
 import { loadBaseEnv } from "@bdx/config";
 import { disableAssetInstanceRoot } from "@bdx/db";
+import type { AssetInstanceId } from "@bdx/ids";
 import { createDbFromEnv, createLoggerFromEnv, destroyDbSafely } from "../../../lib/context.js";
 import {
   getAssetInstanceForParams,
   parseAssetParamsInput,
   resolveAssetSlug,
 } from "../../../lib/assets.js";
-import { parsePositiveBigInt } from "../../../lib/parsers.js";
+import { parseAssetInstanceId } from "../../../lib/parsers.js";
 
 export default class AssetsRootsDisable extends Command {
   static override description = "Disable a root asset instance.";
@@ -31,10 +32,10 @@ export default class AssetsRootsDisable extends Command {
     const db = createDbFromEnv(env);
 
     try {
-      let instanceId: bigint;
+      let instanceId: AssetInstanceId;
 
       if (flags["instance-id"]) {
-        instanceId = parsePositiveBigInt(flags["instance-id"], "instance-id");
+        instanceId = parseAssetInstanceId(flags["instance-id"], "instance-id");
       } else {
         if (!flags.slug || !flags.params) {
           this.error("slug and params are required when instance-id is not provided", { exit: 2 });

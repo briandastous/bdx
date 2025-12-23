@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@bdx/db": "workspace:*",
+    "@bdx/ids": "workspace:*",
     "@bdx/ingest": "workspace:*",
     "@bdx/observability": "workspace:*",
     "@bdx/twitterapi-io": "workspace:*",

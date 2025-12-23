@@ -2,22 +2,28 @@ import { sql } from "kysely";
 import type { DbOrTx } from "../../db.js";
 import type { AssetEventType } from "../../database.js";
 import { updateCurrentMembershipMaterialization } from "./instances.js";
+import type { AssetInstanceId, AssetMaterializationId, PostId, UserId } from "@bdx/ids";
+import {
+  AssetMaterializationId as AssetMaterializationIdBrand,
+  PostId as PostIdBrand,
+  UserId as UserIdBrand,
+} from "@bdx/ids";
 
 export interface SegmentEventInput {
-  userId: bigint;
+  userId: UserId;
   eventType: AssetEventType;
   isFirstAppearance: boolean | null;
 }
 
 export interface PostCorpusEventInput {
-  postId: bigint;
+  postId: PostId;
   eventType: AssetEventType;
   isFirstAppearance: boolean | null;
 }
 
 export async function insertSegmentEvents(
   db: DbOrTx,
-  materializationId: bigint,
+  materializationId: AssetMaterializationId,
   events: SegmentEventInput[],
 ): Promise<number> {
   if (events.length === 0) return 0;
@@ -36,7 +42,7 @@ export async function insertSegmentEvents(
 
 export async function insertPostCorpusEvents(
   db: DbOrTx,
-  materializationId: bigint,
+  materializationId: AssetMaterializationId,
   events: PostCorpusEventInput[],
 ): Promise<number> {
   if (events.length === 0) return 0;
@@ -55,8 +61,8 @@ export async function insertPostCorpusEvents(
 
 export async function listSegmentMembershipSnapshot(
   db: DbOrTx,
-  instanceId: bigint,
-): Promise<bigint[]> {
+  instanceId: AssetInstanceId,
+): Promise<UserId[]> {
   const rows = await db
     .selectFrom("segment_membership_snapshots")
     .select(["user_id"])
@@ -64,13 +70,13 @@ export async function listSegmentMembershipSnapshot(
     .orderBy("user_id", "asc")
     .execute();
 
-  return rows.map((row) => row.user_id);
+  return rows.map((row) => UserIdBrand(row.user_id));
 }
 
 export async function listPostCorpusMembershipSnapshot(
   db: DbOrTx,
-  instanceId: bigint,
-): Promise<bigint[]> {
+  instanceId: AssetInstanceId,
+): Promise<PostId[]> {
   const rows = await db
     .selectFrom("post_corpus_membership_snapshots")
     .select(["post_id"])
@@ -78,12 +84,16 @@ export async function listPostCorpusMembershipSnapshot(
     .orderBy("post_id", "asc")
     .execute();
 
-  return rows.map((row) => row.post_id);
+  return rows.map((row) => PostIdBrand(row.post_id));
 }
 
 export async function replaceSegmentMembershipSnapshot(
   db: DbOrTx,
-  params: { instanceId: bigint; materializationId: bigint; userIds: Iterable<bigint> },
+  params: {
+    instanceId: AssetInstanceId;
+    materializationId: AssetMaterializationId;
+    userIds: Iterable<UserId>;
+  },
 ): Promise<number> {
   const ids = Array.from(new Set(params.userIds)).sort((a, b) => (a < b ? -1 : 1));
 
@@ -111,7 +121,11 @@ export async function replaceSegmentMembershipSnapshot(
 
 export async function replacePostCorpusMembershipSnapshot(
   db: DbOrTx,
-  params: { instanceId: bigint; materializationId: bigint; postIds: Iterable<bigint> },
+  params: {
+    instanceId: AssetInstanceId;
+    materializationId: AssetMaterializationId;
+    postIds: Iterable<PostId>;
+  },
 ): Promise<number> {
   const ids = Array.from(new Set(params.postIds)).sort((a, b) => (a < b ? -1 : 1));
 
@@ -139,8 +153,8 @@ export async function replacePostCorpusMembershipSnapshot(
 
 export async function listSegmentEnteredUserIds(
   db: DbOrTx,
-  instanceId: bigint,
-): Promise<Set<bigint>> {
+  instanceId: AssetInstanceId,
+): Promise<Set<UserId>> {
   const rows = await db
     .selectFrom("segment_events as events")
     .innerJoin("asset_materializations as mat", "mat.id", "events.materialization_id")
@@ -149,13 +163,13 @@ export async function listSegmentEnteredUserIds(
     .where("events.event_type", "=", "enter")
     .execute();
 
-  return new Set(rows.map((row) => row.user_id));
+  return new Set(rows.map((row) => UserIdBrand(row.user_id)));
 }
 
 export async function listPostCorpusEnteredPostIds(
   db: DbOrTx,
-  instanceId: bigint,
-): Promise<Set<bigint>> {
+  instanceId: AssetInstanceId,
+): Promise<Set<PostId>> {
   const rows = await db
     .selectFrom("post_corpus_events as events")
     .innerJoin("asset_materializations as mat", "mat.id", "events.materialization_id")
@@ -164,17 +178,17 @@ export async function listPostCorpusEnteredPostIds(
     .where("events.event_type", "=", "enter")
     .execute();
 
-  return new Set(rows.map((row) => row.post_id));
+  return new Set(rows.map((row) => PostIdBrand(row.post_id)));
 }
 
 type MaterializationOrdering = {
-  id: bigint;
+  id: AssetMaterializationId;
   completedAt: Date;
 };
 
 async function getMaterializationOrdering(
   db: DbOrTx,
-  materializationId: bigint,
+  materializationId: AssetMaterializationId,
 ): Promise<MaterializationOrdering> {
   const row = await db
     .selectFrom("asset_materializations")
@@ -187,15 +201,15 @@ async function getMaterializationOrdering(
   }
 
   return {
-    id: row.id,
+    id: AssetMaterializationIdBrand(row.id),
     completedAt: row.completed_at,
   };
 }
 
 async function getCurrentMembershipMaterializationId(
   db: DbOrTx,
-  instanceId: bigint,
-): Promise<bigint> {
+  instanceId: AssetInstanceId,
+): Promise<AssetMaterializationId> {
   const row = await db
     .selectFrom("asset_instances")
     .select(["current_membership_materialization_id"])
@@ -208,13 +222,13 @@ async function getCurrentMembershipMaterializationId(
       `Missing current membership materialization for instance ${instanceId.toString()}`,
     );
   }
-  return current;
+  return AssetMaterializationIdBrand(current);
 }
 
 export async function getSegmentMembershipAsOf(
   db: DbOrTx,
-  params: { instanceId: bigint; targetMaterializationId: bigint },
-): Promise<bigint[]> {
+  params: { instanceId: AssetInstanceId; targetMaterializationId: AssetMaterializationId },
+): Promise<UserId[]> {
   const checkpointId = await getCurrentMembershipMaterializationId(db, params.instanceId);
   if (params.targetMaterializationId === checkpointId) {
     return listSegmentMembershipSnapshot(db, params.instanceId);
@@ -245,10 +259,11 @@ export async function getSegmentMembershipAsOf(
 
   const current = new Set(await listSegmentMembershipSnapshot(db, params.instanceId));
   for (const row of toggleRows) {
-    if (current.has(row.user_id)) {
-      current.delete(row.user_id);
+    const userId = UserIdBrand(row.user_id);
+    if (current.has(userId)) {
+      current.delete(userId);
     } else {
-      current.add(row.user_id);
+      current.add(userId);
     }
   }
 
@@ -257,8 +272,8 @@ export async function getSegmentMembershipAsOf(
 
 export async function getPostCorpusMembershipAsOf(
   db: DbOrTx,
-  params: { instanceId: bigint; targetMaterializationId: bigint },
-): Promise<bigint[]> {
+  params: { instanceId: AssetInstanceId; targetMaterializationId: AssetMaterializationId },
+): Promise<PostId[]> {
   const checkpointId = await getCurrentMembershipMaterializationId(db, params.instanceId);
   if (params.targetMaterializationId === checkpointId) {
     return listPostCorpusMembershipSnapshot(db, params.instanceId);
@@ -289,10 +304,11 @@ export async function getPostCorpusMembershipAsOf(
 
   const current = new Set(await listPostCorpusMembershipSnapshot(db, params.instanceId));
   for (const row of toggleRows) {
-    if (current.has(row.post_id)) {
-      current.delete(row.post_id);
+    const postId = PostIdBrand(row.post_id);
+    if (current.has(postId)) {
+      current.delete(postId);
     } else {
-      current.add(row.post_id);
+      current.add(postId);
     }
   }
 
@@ -301,8 +317,8 @@ export async function getPostCorpusMembershipAsOf(
 
 export async function rebuildSegmentMembershipSnapshot(
   db: DbOrTx,
-  instanceId: bigint,
-): Promise<{ materializationId: bigint | null; memberCount: number }> {
+  instanceId: AssetInstanceId,
+): Promise<{ materializationId: AssetMaterializationId | null; memberCount: number }> {
   const latest = await db
     .selectFrom("asset_materializations")
     .select(["id", "completed_at"])
@@ -328,28 +344,31 @@ export async function rebuildSegmentMembershipSnapshot(
     .orderBy("mat.id", "asc")
     .execute();
 
-  const membership = new Set<bigint>();
+  const membership = new Set<UserId>();
   for (const event of events) {
     if (event.event_type === "enter") {
-      membership.add(event.user_id);
+      membership.add(UserIdBrand(event.user_id));
     } else {
-      membership.delete(event.user_id);
+      membership.delete(UserIdBrand(event.user_id));
     }
   }
 
   await replaceSegmentMembershipSnapshot(db, {
     instanceId,
-    materializationId: latest.id,
+    materializationId: AssetMaterializationIdBrand(latest.id),
     userIds: membership,
   });
 
-  return { materializationId: latest.id, memberCount: membership.size };
+  return {
+    materializationId: AssetMaterializationIdBrand(latest.id),
+    memberCount: membership.size,
+  };
 }
 
 export async function rebuildPostCorpusMembershipSnapshot(
   db: DbOrTx,
-  instanceId: bigint,
-): Promise<{ materializationId: bigint | null; memberCount: number }> {
+  instanceId: AssetInstanceId,
+): Promise<{ materializationId: AssetMaterializationId | null; memberCount: number }> {
   const latest = await db
     .selectFrom("asset_materializations")
     .select(["id", "completed_at"])
@@ -375,20 +394,23 @@ export async function rebuildPostCorpusMembershipSnapshot(
     .orderBy("mat.id", "asc")
     .execute();
 
-  const membership = new Set<bigint>();
+  const membership = new Set<PostId>();
   for (const event of events) {
     if (event.event_type === "enter") {
-      membership.add(event.post_id);
+      membership.add(PostIdBrand(event.post_id));
     } else {
-      membership.delete(event.post_id);
+      membership.delete(PostIdBrand(event.post_id));
     }
   }
 
   await replacePostCorpusMembershipSnapshot(db, {
     instanceId,
-    materializationId: latest.id,
+    materializationId: AssetMaterializationIdBrand(latest.id),
     postIds: membership,
   });
 
-  return { materializationId: latest.id, memberCount: membership.size };
+  return {
+    materializationId: AssetMaterializationIdBrand(latest.id),
+    memberCount: membership.size,
+  };
 }

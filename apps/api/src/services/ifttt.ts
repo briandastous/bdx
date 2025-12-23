@@ -1,4 +1,5 @@
 import type { Db, IngestKind, JsonValue } from "@bdx/db";
+import type { IngestEventId, UserId } from "@bdx/ids";
 import {
   insertWebhookFollowEvent,
   upsertFollows,
@@ -12,16 +13,16 @@ import { userProfileInputFromXUser } from "@bdx/ingest";
 import type { XUserData } from "@bdx/twitterapi-io";
 
 export interface WebhookFollowResult {
-  ingestEventId: bigint;
+  ingestEventId: IngestEventId;
   ingestKind: IngestKind;
-  targetUserId: bigint;
-  followerUserId: bigint;
+  targetUserId: UserId;
+  followerUserId: UserId;
   followerHandle: string;
 }
 
 export async function ingestIftttNewFollower(params: {
   db: Db;
-  targetUserId: bigint;
+  targetUserId: UserId;
   targetUserHandle: string;
   followerHandle: string;
   followerProfile: XUserData;
@@ -30,10 +31,10 @@ export async function ingestIftttNewFollower(params: {
   const followerUserId = params.followerProfile.userId;
   const followerUserHandle = params.followerProfile.userName;
 
-  if (followerUserId === null) {
+  if (followerUserId == null) {
     throw new Error("Follower profile missing userId");
   }
-  if (!followerUserHandle) {
+  if (followerUserHandle == null || followerUserHandle.trim() === "") {
     throw new Error("Follower profile missing handle");
   }
 

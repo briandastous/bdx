@@ -90,4 +90,4 @@ These best practices are synthesized from the item pages in Dan Vanderkam’s Ef
 
 ## Repo-specific additions (prefixed `Rxx-`)
 
-- None yet.
+- R01. [Refactor-Friendly TypeScript Checklist](R01-refactor-friendly-typescript-checklist.md)

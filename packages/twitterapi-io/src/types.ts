@@ -1,3 +1,5 @@
+import type { PostId, UserId } from "@bdx/ids";
+
 export type JsonPrimitive = boolean | null | number | string;
 export type JsonValue = JsonPrimitive | JsonObject | JsonArray;
 export interface JsonObject {
@@ -19,7 +21,7 @@ export interface ResponseSnapshot extends JsonObject {
 }
 
 export interface XUserData {
-  userId: bigint | null;
+  userId: UserId | null;
   userName: string | null;
   displayName: string | null;
   profileUrl: string | null;
@@ -67,8 +69,8 @@ export interface FollowingsPage {
 }
 
 export interface TweetData {
-  postId: bigint;
-  authorUserId: bigint;
+  postId: PostId;
+  authorUserId: UserId;
   createdAt: Date;
   text: string | null;
   lang: string | null;

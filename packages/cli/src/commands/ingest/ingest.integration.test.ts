@@ -3,6 +3,7 @@ import type { AddressInfo } from "node:net";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { type StartedPostgreSqlContainer, PostgreSqlContainer } from "@testcontainers/postgresql";
 import { createDb, destroyDb, migrateToLatest, type Db } from "@bdx/db";
+import { UserId } from "@bdx/ids";
 import IngestFollowers from "./followers.js";
 
 type EnvSnapshot = Record<string, string | undefined>;
@@ -131,6 +132,6 @@ describe("CLI ingest commands", () => {
       .select(["target_id", "follower_id", "is_deleted"])
       .orderBy("follower_id", "asc")
       .execute();
-    expect(edges).toEqual([{ target_id: 1n, follower_id: 10n, is_deleted: false }]);
+    expect(edges).toEqual([{ target_id: UserId(1n), follower_id: UserId(10n), is_deleted: false }]);
   });
 });

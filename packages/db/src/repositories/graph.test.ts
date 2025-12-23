@@ -1,8 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import {
-  type StartedPostgreSqlContainer,
-  PostgreSqlContainer,
-} from "@testcontainers/postgresql";
+import { type StartedPostgreSqlContainer, PostgreSqlContainer } from "@testcontainers/postgresql";
 import type { Db, IngestKind, UserProfileInput } from "../index.js";
 import {
   createDb,
@@ -13,20 +10,21 @@ import {
   upsertPosts,
   upsertUserProfile,
 } from "../index.js";
+import { IngestEventId, PostId, UserId } from "@bdx/ids";
 
-async function createIngestEvent(db: Db, ingestKind: IngestKind): Promise<bigint> {
+async function createIngestEvent(db: Db, ingestKind: IngestKind): Promise<IngestEventId> {
   const row = await db
     .insertInto("ingest_events")
     .values({ ingest_kind: ingestKind })
     .returning(["id"])
     .executeTakeFirstOrThrow();
-  return row.id;
+  return IngestEventId(row.id);
 }
 
 function buildUserProfile(input: {
-  id: bigint;
+  id: UserId;
   handle: string;
-  ingestEventId: bigint;
+  ingestEventId: IngestEventId;
 }): UserProfileInput {
   return {
     id: input.id,
@@ -101,33 +99,37 @@ describe("core repositories", () => {
   });
 
   it("revives soft-deleted follow edges on upsert", async () => {
-    await upsertFollows(db, [{ targetId: 1n, followerId: 2n }]);
-    await markFollowersSoftDeleted(db, { targetUserId: 1n, activeFollowerIds: [] });
+    const targetId = UserId(1n);
+    const followerId = UserId(2n);
+    await upsertFollows(db, [{ targetId, followerId }]);
+    await markFollowersSoftDeleted(db, { targetUserId: targetId, activeFollowerIds: [] });
 
     let row = await db
       .selectFrom("follows")
       .select(["is_deleted"])
-      .where("target_id", "=", 1n)
-      .where("follower_id", "=", 2n)
+      .where("target_id", "=", targetId)
+      .where("follower_id", "=", followerId)
       .executeTakeFirstOrThrow();
     expect(row.is_deleted).toBe(true);
 
-    await upsertFollows(db, [{ targetId: 1n, followerId: 2n }]);
+    await upsertFollows(db, [{ targetId, followerId }]);
 
     row = await db
       .selectFrom("follows")
       .select(["is_deleted"])
-      .where("target_id", "=", 1n)
-      .where("follower_id", "=", 2n)
+      .where("target_id", "=", targetId)
+      .where("follower_id", "=", followerId)
       .executeTakeFirstOrThrow();
     expect(row.is_deleted).toBe(false);
   });
 
   it("revives soft-deleted posts on upsert", async () => {
+    const postId = PostId(10n);
+    const authorId = UserId(1n);
     await upsertPosts(db, [
       {
-        id: 10n,
-        authorId: 1n,
+        id: postId,
+        authorId,
         postedAt: new Date("2024-01-01T00:00:00Z"),
         text: "hello",
         lang: "en",
@@ -135,12 +137,12 @@ describe("core repositories", () => {
       },
     ]);
 
-    await db.updateTable("posts").set({ is_deleted: true }).where("id", "=", 10n).execute();
+    await db.updateTable("posts").set({ is_deleted: true }).where("id", "=", postId).execute();
 
     await upsertPosts(db, [
       {
-        id: 10n,
-        authorId: 1n,
+        id: postId,
+        authorId,
         postedAt: new Date("2024-01-01T00:00:00Z"),
         text: "hello again",
         lang: "en",
@@ -151,7 +153,7 @@ describe("core repositories", () => {
     const row = await db
       .selectFrom("posts")
       .select(["text", "is_deleted"])
-      .where("id", "=", 10n)
+      .where("id", "=", postId)
       .executeTakeFirstOrThrow();
     expect(row.text).toBe("hello again");
     expect(row.is_deleted).toBe(false);
@@ -159,11 +161,22 @@ describe("core repositories", () => {
 
   it("clears conflicting handles and records handle history", async () => {
     const ingestEventId1 = await createIngestEvent(db, "twitterio_api_user_followers");
-    await upsertUserProfile(db, buildUserProfile({ id: 1n, handle: "alpha", ingestEventId: ingestEventId1 }));
-    await upsertUserProfile(db, buildUserProfile({ id: 2n, handle: "beta", ingestEventId: ingestEventId1 }));
+    const user1 = UserId(1n);
+    const user2 = UserId(2n);
+    await upsertUserProfile(
+      db,
+      buildUserProfile({ id: user1, handle: "alpha", ingestEventId: ingestEventId1 }),
+    );
+    await upsertUserProfile(
+      db,
+      buildUserProfile({ id: user2, handle: "beta", ingestEventId: ingestEventId1 }),
+    );
 
     const ingestEventId2 = await createIngestEvent(db, "twitterio_api_user_followers");
-    await upsertUserProfile(db, buildUserProfile({ id: 2n, handle: "alpha", ingestEventId: ingestEventId2 }));
+    await upsertUserProfile(
+      db,
+      buildUserProfile({ id: user2, handle: "alpha", ingestEventId: ingestEventId2 }),
+    );
 
     const users = await db
       .selectFrom("users")
@@ -172,8 +185,8 @@ describe("core repositories", () => {
       .execute();
 
     expect(users).toEqual([
-      { id: 1n, handle: null },
-      { id: 2n, handle: "alpha" },
+      { id: user1, handle: null },
+      { id: user2, handle: "alpha" },
     ]);
 
     const history = await db
@@ -183,8 +196,8 @@ describe("core repositories", () => {
       .execute();
 
     expect(history).toEqual([
-      { user_id: 1n, previous_handle: "alpha", new_handle: "" },
-      { user_id: 2n, previous_handle: "beta", new_handle: "alpha" },
+      { user_id: user1, previous_handle: "alpha", new_handle: "" },
+      { user_id: user2, previous_handle: "beta", new_handle: "alpha" },
     ]);
   });
 });

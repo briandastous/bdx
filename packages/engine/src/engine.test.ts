@@ -24,6 +24,7 @@ import {
   upsertPosts,
   type Db,
 } from "@bdx/db";
+import { AssetInstanceId, PostId, UserId } from "@bdx/ids";
 import { createLogger } from "@bdx/observability";
 import { TwitterApiClient } from "@bdx/twitterapi-io";
 import { AssetEngine } from "./engine.js";
@@ -95,7 +96,10 @@ describe("AssetEngine materialization", () => {
   });
 
   it("materializes specified users segments and records events", async () => {
-    await ensureUsers(db, [101n, 102n, 103n]);
+    const user101 = UserId(101n);
+    const user102 = UserId(102n);
+    const user103 = UserId(103n);
+    await ensureUsers(db, [user101, user102, user103]);
 
     const params: AssetParams = {
       assetSlug: "segment_specified_users",
@@ -118,7 +122,7 @@ describe("AssetEngine materialization", () => {
 
     await replaceSpecifiedUsersInputs(db, {
       instanceId: instance.id,
-      userExternalIds: [101n, 102n],
+      userExternalIds: [user101, user102],
     });
     await enableAssetInstanceRoot(db, instance.id);
 
@@ -137,18 +141,21 @@ describe("AssetEngine materialization", () => {
     await engine.tick(new AbortController().signal);
 
     const firstMaterialization = await getLatestSuccessfulMaterialization(db, instance.id);
-    expect(firstMaterialization?.status).toBe("success");
-    expect(firstMaterialization?.outputRevision).toBe(1n);
+    if (!firstMaterialization) {
+      throw new Error("Expected first materialization to exist");
+    }
+    expect(firstMaterialization.status).toBe("success");
+    expect(firstMaterialization.outputRevision).toBe(1n);
 
     const firstEvents = await db
       .selectFrom("segment_events")
       .select(["user_id", "event_type", "is_first_appearance"])
-      .where("materialization_id", "=", firstMaterialization?.id ?? 0n)
+      .where("materialization_id", "=", firstMaterialization.id)
       .orderBy("user_id", "asc")
       .execute();
     expect(firstEvents).toEqual([
-      { user_id: 101n, event_type: "enter", is_first_appearance: true },
-      { user_id: 102n, event_type: "enter", is_first_appearance: true },
+      { user_id: user101, event_type: "enter", is_first_appearance: true },
+      { user_id: user102, event_type: "enter", is_first_appearance: true },
     ]);
     const firstSnapshot = await db
       .selectFrom("segment_membership_snapshots")
@@ -156,36 +163,37 @@ describe("AssetEngine materialization", () => {
       .where("instance_id", "=", instance.id)
       .orderBy("user_id", "asc")
       .execute();
-    expect(firstSnapshot.map((row) => row.user_id)).toEqual([101n, 102n]);
+    expect(firstSnapshot.map((row) => row.user_id)).toEqual([user101, user102]);
     const firstPointer = await db
       .selectFrom("asset_instances")
       .select(["current_membership_materialization_id"])
       .where("id", "=", instance.id)
       .executeTakeFirst();
-    expect(firstPointer?.current_membership_materialization_id).toBe(
-      firstMaterialization?.id ?? null,
-    );
+    expect(firstPointer?.current_membership_materialization_id).toBe(firstMaterialization.id);
 
     await replaceSpecifiedUsersInputs(db, {
       instanceId: instance.id,
-      userExternalIds: [102n, 103n],
+      userExternalIds: [user102, user103],
     });
 
     await engine.tick(new AbortController().signal);
 
     const secondMaterialization = await getLatestSuccessfulMaterialization(db, instance.id);
-    expect(secondMaterialization?.id).not.toEqual(firstMaterialization?.id);
-    expect(secondMaterialization?.outputRevision).toBe(2n);
+    if (!secondMaterialization) {
+      throw new Error("Expected second materialization to exist");
+    }
+    expect(secondMaterialization.id).not.toEqual(firstMaterialization.id);
+    expect(secondMaterialization.outputRevision).toBe(2n);
 
     const secondEvents = await db
       .selectFrom("segment_events")
       .select(["user_id", "event_type", "is_first_appearance"])
-      .where("materialization_id", "=", secondMaterialization?.id ?? 0n)
+      .where("materialization_id", "=", secondMaterialization.id)
       .orderBy("user_id", "asc")
       .execute();
     expect(secondEvents).toEqual([
-      { user_id: 101n, event_type: "exit", is_first_appearance: null },
-      { user_id: 103n, event_type: "enter", is_first_appearance: true },
+      { user_id: user101, event_type: "exit", is_first_appearance: null },
+      { user_id: user103, event_type: "enter", is_first_appearance: true },
     ]);
     const secondSnapshot = await db
       .selectFrom("segment_membership_snapshots")
@@ -193,19 +201,19 @@ describe("AssetEngine materialization", () => {
       .where("instance_id", "=", instance.id)
       .orderBy("user_id", "asc")
       .execute();
-    expect(secondSnapshot.map((row) => row.user_id)).toEqual([102n, 103n]);
+    expect(secondSnapshot.map((row) => row.user_id)).toEqual([user102, user103]);
     const secondPointer = await db
       .selectFrom("asset_instances")
       .select(["current_membership_materialization_id"])
       .where("id", "=", instance.id)
       .executeTakeFirst();
-    expect(secondPointer?.current_membership_materialization_id).toBe(
-      secondMaterialization?.id ?? null,
-    );
+    expect(secondPointer?.current_membership_materialization_id).toBe(secondMaterialization.id);
   });
 
   it("emits structured logs with materialization IDs", async () => {
-    await ensureUsers(db, [201n, 202n]);
+    const user201 = UserId(201n);
+    const user202 = UserId(202n);
+    await ensureUsers(db, [user201, user202]);
 
     const params: AssetParams = {
       assetSlug: "segment_specified_users",
@@ -228,7 +236,7 @@ describe("AssetEngine materialization", () => {
 
     await replaceSpecifiedUsersInputs(db, {
       instanceId: instance.id,
-      userExternalIds: [201n, 202n],
+      userExternalIds: [user201, user202],
     });
     await enableAssetInstanceRoot(db, instance.id);
 
@@ -262,7 +270,8 @@ describe("AssetEngine materialization", () => {
   });
 
   it("repairs checkpoints when membership pointers are missing", async () => {
-    await ensureUsers(db, [201n]);
+    const user201 = UserId(201n);
+    await ensureUsers(db, [user201]);
 
     const params: AssetParams = {
       assetSlug: "segment_specified_users",
@@ -293,7 +302,7 @@ describe("AssetEngine materialization", () => {
       triggerReason: "checkpoint",
     });
     await insertSegmentEvents(db, materialization.id, [
-      { userId: 201n, eventType: "enter", isFirstAppearance: true },
+      { userId: user201, eventType: "enter", isFirstAppearance: true },
     ]);
     await updateAssetMaterialization(db, materialization.id, {
       status: "success",
@@ -328,21 +337,25 @@ describe("AssetEngine materialization", () => {
   });
 
   it("materializes post corpora from segment membership", async () => {
-    const members = [901n, 902n];
+    const member901 = UserId(901n);
+    const member902 = UserId(902n);
+    const members = [member901, member902];
     await ensureUsers(db, members);
 
+    const post9001 = PostId(9001n);
+    const post9002 = PostId(9002n);
     await upsertPosts(db, [
       {
-        id: 9001n,
-        authorId: 901n,
+        id: post9001,
+        authorId: member901,
         postedAt: new Date("2024-01-01T00:00:00Z"),
         text: "First post",
         lang: null,
         rawJson: null,
       },
       {
-        id: 9002n,
-        authorId: 902n,
+        id: post9002,
+        authorId: member902,
         postedAt: new Date("2024-01-02T00:00:00Z"),
         text: "Second post",
         lang: null,
@@ -412,6 +425,9 @@ describe("AssetEngine materialization", () => {
     const postCorpusOutcome = await engine.materializeParams(postCorpusParams);
     expect(postCorpusOutcome.status).toBe("success");
     expect(postCorpusOutcome.materializationId).not.toBeNull();
+    if (!postCorpusOutcome.materializationId) {
+      throw new Error("Expected post corpus materialization id");
+    }
 
     const snapshot = await db
       .selectFrom("post_corpus_membership_snapshots")
@@ -419,17 +435,17 @@ describe("AssetEngine materialization", () => {
       .where("instance_id", "=", postCorpusOutcome.instanceId)
       .orderBy("post_id", "asc")
       .execute();
-    expect(snapshot.map((row) => row.post_id)).toEqual([9001n, 9002n]);
+    expect(snapshot.map((row) => row.post_id)).toEqual([post9001, post9002]);
 
     const events = await db
       .selectFrom("post_corpus_events")
       .select(["post_id", "event_type", "is_first_appearance"])
-      .where("materialization_id", "=", postCorpusOutcome.materializationId ?? 0n)
+      .where("materialization_id", "=", postCorpusOutcome.materializationId)
       .orderBy("post_id", "asc")
       .execute();
     expect(events).toEqual([
-      { post_id: 9001n, event_type: "enter", is_first_appearance: true },
-      { post_id: 9002n, event_type: "enter", is_first_appearance: true },
+      { post_id: post9001, event_type: "enter", is_first_appearance: true },
+      { post_id: post9002, event_type: "enter", is_first_appearance: true },
     ]);
   });
 
@@ -446,7 +462,7 @@ describe("AssetEngine materialization", () => {
       postsMaxQueryLength: 512,
     });
 
-    const missingInstanceId = 999999n;
+    const missingInstanceId = AssetInstanceId(999999n);
     const outcome = await engine.materializeInstanceById(missingInstanceId, {
       triggerReason: "test",
     });
@@ -545,7 +561,7 @@ describe("AssetEngine materialization", () => {
   });
 
   it("uses incremental follower syncs after a full refresh exists", async () => {
-    const targetUserId = 42n;
+    const targetUserId = UserId(42n);
     await ensureUsers(db, [targetUserId]);
 
     const fullRun = await createFollowersSyncRun(db, {
@@ -619,7 +635,7 @@ describe("AssetEngine materialization", () => {
   });
 
   it("materializes dependency closures for mutuals segments", async () => {
-    const subjectUserId = 77n;
+    const subjectUserId = UserId(77n);
     await ensureUsers(db, [subjectUserId]);
 
     const twitterClient = new TwitterApiClient({
@@ -686,7 +702,7 @@ describe("AssetEngine materialization", () => {
   });
 
   it("records ingest lock timeouts when follower syncs are locked", async () => {
-    const targetUserId = 505n;
+    const targetUserId = UserId(505n);
     await ensureUsers(db, [targetUserId]);
 
     const lockDb = createDb(container.getConnectionUri());

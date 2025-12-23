@@ -46,17 +46,40 @@ import type { TwitterApiClient } from "@bdx/twitterapi-io";
 import type { AssetParams } from "./assets/params.js";
 import { PARAMS_HASH_VERSION, formatAssetParams, paramsHashV1 } from "./assets/params.js";
 import { getAssetDefinition } from "./assets/registry.js";
-import type { AssetItemKind, IngestRequirement, ResolvedDependency } from "./assets/types.js";
+import type {
+  AssetItemId,
+  AssetItemKind,
+  IngestRequirement,
+  ResolvedDependency,
+} from "./assets/types.js";
 import type { HashVersion } from "./hashing.js";
 import { hashPartsV1 } from "./hashing.js";
+import { assertNever } from "./utils/assert_never.js";
+import type {
+  AssetParamsId,
+  AssetInstanceId,
+  AssetMaterializationId,
+  PlannerRunId,
+  SchedulerJobId,
+  SchedulerTargetId,
+  UserId,
+  PostId,
+} from "@bdx/ids";
+import {
+  PlannerRunId as PlannerRunIdBrand,
+  SchedulerJobId as SchedulerJobIdBrand,
+  SchedulerTargetId as SchedulerTargetIdBrand,
+} from "@bdx/ids";
 
 type MaterializationOutcome = {
-  instanceId: bigint;
-  materializationId: bigint | null;
+  instanceId: AssetInstanceId;
+  materializationId: AssetMaterializationId | null;
   outputRevision: bigint | null;
   status: "success" | "skipped" | "error";
   errorMessage?: string | null;
 };
+
+const ASSET_ENGINE_JOB_ID = SchedulerJobIdBrand("asset_engine");
 
 export interface AssetEngineParams {
   db: Db;
@@ -105,11 +128,11 @@ export class AssetEngine {
   }
 
   async materializeInstanceById(
-    instanceId: bigint,
+    instanceId: AssetInstanceId,
     options?: { triggerReason?: string },
   ): Promise<MaterializationOutcome> {
-    const plannerRunId = randomUUID();
-    const memo = new Map<bigint, Promise<MaterializationOutcome>>();
+    const plannerRunId = PlannerRunIdBrand(randomUUID());
+    const memo = new Map<AssetInstanceId, Promise<MaterializationOutcome>>();
     return this.materializeInstance(instanceId, {
       memo,
       plannerRunId,
@@ -122,8 +145,8 @@ export class AssetEngine {
     params: AssetParams,
     options?: { triggerReason?: string },
   ): Promise<MaterializationOutcome> {
-    const plannerRunId = randomUUID();
-    const memo = new Map<bigint, Promise<MaterializationOutcome>>();
+    const plannerRunId = PlannerRunIdBrand(randomUUID());
+    const memo = new Map<AssetInstanceId, Promise<MaterializationOutcome>>();
     return this.ensureAssetInstanceAndMaterialize(params, {
       memo,
       plannerRunId,
@@ -133,8 +156,8 @@ export class AssetEngine {
   }
 
   async tick(signal: AbortSignal): Promise<void> {
-    const plannerRunId = randomUUID();
-    const memo = new Map<bigint, Promise<MaterializationOutcome>>();
+    const plannerRunId = PlannerRunIdBrand(randomUUID());
+    const memo = new Map<AssetInstanceId, Promise<MaterializationOutcome>>();
     const tickLogger = this.logger.child({ planner_run_id: plannerRunId });
 
     tickLogger.info("asset engine tick started");
@@ -165,13 +188,13 @@ export class AssetEngine {
 
   private async materializeFanoutRoot(
     root: {
-      sourceInstanceId: bigint;
+      sourceInstanceId: AssetInstanceId;
       targetAssetSlug: AssetSlug;
       fanoutMode: "global_per_item" | "scoped_by_source";
     },
     params: {
-      memo: Map<bigint, Promise<MaterializationOutcome>>;
-      plannerRunId: string;
+      memo: Map<AssetInstanceId, Promise<MaterializationOutcome>>;
+      plannerRunId: PlannerRunId;
       signal: AbortSignal;
     },
   ): Promise<void> {
@@ -184,8 +207,8 @@ export class AssetEngine {
 
     if (!sourceOutcome.materializationId) {
       await this.recordDecision({
-        jobId: "asset_engine",
-        targetId: root.sourceInstanceId.toString(),
+        jobId: ASSET_ENGINE_JOB_ID,
+        targetId: SchedulerTargetIdBrand(root.sourceInstanceId.toString()),
         targetParams: null,
         decision: "fanout_source_unavailable",
         reason: "Source instance did not materialize",
@@ -197,8 +220,8 @@ export class AssetEngine {
     const sourceInstance = await getAssetInstanceById(this.db, root.sourceInstanceId);
     if (!sourceInstance) {
       await this.recordDecision({
-        jobId: "asset_engine",
-        targetId: root.sourceInstanceId.toString(),
+        jobId: ASSET_ENGINE_JOB_ID,
+        targetId: SchedulerTargetIdBrand(root.sourceInstanceId.toString()),
         targetParams: null,
         decision: "fanout_source_missing",
         reason: "Source instance record missing",
@@ -216,8 +239,8 @@ export class AssetEngine {
     const targetDefinition = getAssetDefinition(root.targetAssetSlug);
     if (!targetDefinition.paramsFromFanoutItem) {
       await this.recordDecision({
-        jobId: "asset_engine",
-        targetId: root.sourceInstanceId.toString(),
+        jobId: ASSET_ENGINE_JOB_ID,
+        targetId: SchedulerTargetIdBrand(root.sourceInstanceId.toString()),
         targetParams: null,
         decision: "fanout_target_invalid",
         reason: `Target asset ${root.targetAssetSlug} cannot be fanout from items`,
@@ -243,8 +266,8 @@ export class AssetEngine {
       });
       if (targetOutcome.status === "error") {
         await this.recordDecision({
-          jobId: "asset_engine",
-          targetId: root.sourceInstanceId.toString(),
+          jobId: ASSET_ENGINE_JOB_ID,
+          targetId: SchedulerTargetIdBrand(root.sourceInstanceId.toString()),
           targetParams: formatAssetParams(targetParams),
           decision: "fanout_target_error",
           reason: "Failed to materialize fanout target",
@@ -257,10 +280,10 @@ export class AssetEngine {
   private async ensureAssetInstanceAndMaterialize(
     params: AssetParams,
     options: {
-      memo: Map<bigint, Promise<MaterializationOutcome>>;
-      plannerRunId: string;
+      memo: Map<AssetInstanceId, Promise<MaterializationOutcome>>;
+      plannerRunId: PlannerRunId;
       triggerReason: string;
-      requestedByMaterializationIds: bigint[];
+      requestedByMaterializationIds: AssetMaterializationId[];
     },
   ): Promise<MaterializationOutcome> {
     const paramsHash = paramsHashV1(params);
@@ -285,7 +308,7 @@ export class AssetEngine {
     params: AssetParams,
     paramsHash: string,
     paramsHashVersion: number,
-  ): Promise<bigint> {
+  ): Promise<AssetParamsId> {
     switch (params.assetSlug) {
       case "segment_specified_users": {
         const record = await getOrCreateAssetParams(this.db, {
@@ -331,17 +354,17 @@ export class AssetEngine {
         return record.id;
       }
       default:
-        throw new Error("Unsupported asset params");
+        return assertNever(params, "Unsupported asset params");
     }
   }
 
   private async materializeInstance(
-    instanceId: bigint,
+    instanceId: AssetInstanceId,
     options: {
-      memo: Map<bigint, Promise<MaterializationOutcome>>;
-      plannerRunId: string;
+      memo: Map<AssetInstanceId, Promise<MaterializationOutcome>>;
+      plannerRunId: PlannerRunId;
       triggerReason: string | null;
-      requestedByMaterializationIds: bigint[];
+      requestedByMaterializationIds: AssetMaterializationId[];
     },
   ): Promise<MaterializationOutcome> {
     const existing = options.memo.get(instanceId);
@@ -353,19 +376,19 @@ export class AssetEngine {
   }
 
   private async materializeInstanceInternal(
-    instanceId: bigint,
+    instanceId: AssetInstanceId,
     options: {
-      memo: Map<bigint, Promise<MaterializationOutcome>>;
-      plannerRunId: string;
+      memo: Map<AssetInstanceId, Promise<MaterializationOutcome>>;
+      plannerRunId: PlannerRunId;
       triggerReason: string | null;
-      requestedByMaterializationIds: bigint[];
+      requestedByMaterializationIds: AssetMaterializationId[];
     },
   ): Promise<MaterializationOutcome> {
     const instance = await getAssetInstanceById(this.db, instanceId);
     if (!instance) {
       await this.recordDecision({
-        jobId: "asset_engine",
-        targetId: instanceId.toString(),
+        jobId: ASSET_ENGINE_JOB_ID,
+        targetId: SchedulerTargetIdBrand(instanceId.toString()),
         targetParams: null,
         decision: "instance_missing",
         reason: "Asset instance not found",
@@ -377,8 +400,8 @@ export class AssetEngine {
     const paramsRecord = await getAssetParamsByInstanceId(this.db, instanceId);
     if (!paramsRecord) {
       await this.recordDecision({
-        jobId: "asset_engine",
-        targetId: instanceId.toString(),
+        jobId: ASSET_ENGINE_JOB_ID,
+        targetId: SchedulerTargetIdBrand(instanceId.toString()),
         targetParams: null,
         decision: "params_missing",
         reason: "Asset params not found for instance",
@@ -395,8 +418,8 @@ export class AssetEngine {
       const errors = issues.filter((issue) => issue.severity === "error");
       for (const issue of issues) {
         await this.recordDecision({
-          jobId: "asset_engine",
-          targetId: instanceId.toString(),
+          jobId: ASSET_ENGINE_JOB_ID,
+          targetId: SchedulerTargetIdBrand(instanceId.toString()),
           targetParams: formatAssetParams(params),
           decision: `validation_${issue.severity}`,
           reason: issue.message,
@@ -463,7 +486,7 @@ export class AssetEngine {
           return null;
         }
 
-        let materializationId: bigint | null = null;
+        let materializationId: AssetMaterializationId | null = null;
         try {
           this.logger.info(
             {
@@ -507,68 +530,82 @@ export class AssetEngine {
             options.plannerRunId,
           );
 
-          const membership = await definition.computeMembership(params, dependencies, {
+          const computedMembership = await definition.computeMembership(params, dependencies, {
             db: trx,
             instanceId,
           });
-          const previousMembership =
-            definition.outputItemKind === "user"
-              ? await listSegmentMembershipSnapshot(trx, instanceId)
-              : await listPostCorpusMembershipSnapshot(trx, instanceId);
 
-          const previousSet = new Set(previousMembership);
-          const currentSet = new Set(membership);
-
-          const enterItems = membership.filter((id) => !previousSet.has(id));
-          const exitItems = previousMembership.filter((id) => !currentSet.has(id));
+          let membership: UserId[] | PostId[];
+          let enterItems: UserId[] | PostId[];
+          let exitItems: UserId[] | PostId[];
 
           if (definition.outputItemKind === "user") {
+            const userMembership = asUserIds(computedMembership);
+            const previousMembership = await listSegmentMembershipSnapshot(trx, instanceId);
+            const previousSet = new Set<UserId>(previousMembership);
+            const currentSet = new Set<UserId>(userMembership);
+            const enterUsers = userMembership.filter((id) => !previousSet.has(id));
+            const exitUsers = previousMembership.filter((id) => !currentSet.has(id));
             const seen = await listSegmentEnteredUserIds(trx, instanceId);
+
             await insertSegmentEvents(trx, materialization.id, [
-              ...enterItems.map((userId) => ({
+              ...enterUsers.map((userId) => ({
                 userId,
                 eventType: "enter" as const,
                 isFirstAppearance: !seen.has(userId),
               })),
-              ...exitItems.map((userId) => ({
+              ...exitUsers.map((userId) => ({
                 userId,
                 eventType: "exit" as const,
                 isFirstAppearance: null,
               })),
             ]);
+
+            await replaceSegmentMembershipSnapshot(trx, {
+              instanceId,
+              materializationId: materialization.id,
+              userIds: userMembership,
+            });
+
+            membership = userMembership;
+            enterItems = enterUsers;
+            exitItems = exitUsers;
           } else {
+            const postMembership = asPostIds(computedMembership);
+            const previousMembership = await listPostCorpusMembershipSnapshot(trx, instanceId);
+            const previousSet = new Set<PostId>(previousMembership);
+            const currentSet = new Set<PostId>(postMembership);
+            const enterPosts = postMembership.filter((id) => !previousSet.has(id));
+            const exitPosts = previousMembership.filter((id) => !currentSet.has(id));
             const seen = await listPostCorpusEnteredPostIds(trx, instanceId);
+
             await insertPostCorpusEvents(trx, materialization.id, [
-              ...enterItems.map((postId) => ({
+              ...enterPosts.map((postId) => ({
                 postId,
                 eventType: "enter" as const,
                 isFirstAppearance: !seen.has(postId),
               })),
-              ...exitItems.map((postId) => ({
+              ...exitPosts.map((postId) => ({
                 postId,
                 eventType: "exit" as const,
                 isFirstAppearance: null,
               })),
             ]);
+
+            await replacePostCorpusMembershipSnapshot(trx, {
+              instanceId,
+              materializationId: materialization.id,
+              postIds: postMembership,
+            });
+
+            membership = postMembership;
+            enterItems = enterPosts;
+            exitItems = exitPosts;
           }
 
           const previousRevision = latestSuccess?.outputRevision ?? 0n;
           const membershipChanged = enterItems.length > 0 || exitItems.length > 0;
           const outputRevision = membershipChanged ? previousRevision + 1n : previousRevision;
-
-          if (definition.outputItemKind === "user") {
-            await replaceSegmentMembershipSnapshot(trx, {
-              instanceId,
-              materializationId: materialization.id,
-              userIds: membership,
-            });
-          } else {
-            await replacePostCorpusMembershipSnapshot(trx, {
-              instanceId,
-              materializationId: materialization.id,
-              postIds: membership,
-            });
-          }
 
           await updateAssetMaterialization(trx, materialization.id, {
             status: "success",
@@ -629,8 +666,8 @@ export class AssetEngine {
 
     if (!outcome) {
       await this.recordDecision({
-        jobId: "asset_engine",
-        targetId: instanceId.toString(),
+        jobId: ASSET_ENGINE_JOB_ID,
+        targetId: SchedulerTargetIdBrand(instanceId.toString()),
         targetParams: formatAssetParams(params),
         decision: "lock_timeout",
         reason: "Failed to acquire materialization lock",
@@ -641,8 +678,8 @@ export class AssetEngine {
 
     if (outcome.status === "error") {
       await this.recordDecision({
-        jobId: "asset_engine",
-        targetId: instanceId.toString(),
+        jobId: ASSET_ENGINE_JOB_ID,
+        targetId: SchedulerTargetIdBrand(instanceId.toString()),
         targetParams: formatAssetParams(params),
         decision: "materialization_error",
         reason: outcome.errorMessage ?? "Materialization failed",
@@ -657,7 +694,7 @@ export class AssetEngine {
     db: DbOrTx,
     instance: AssetInstanceRecord,
     itemKind: AssetItemKind,
-    plannerRunId: string,
+    plannerRunId: PlannerRunId,
   ): Promise<void> {
     if (instance.currentMembershipMaterializationId !== null) return;
 
@@ -667,8 +704,8 @@ export class AssetEngine {
         : await rebuildPostCorpusMembershipSnapshot(db, instance.id);
 
     await this.recordDecision({
-      jobId: "asset_engine",
-      targetId: instance.id.toString(),
+      jobId: ASSET_ENGINE_JOB_ID,
+      targetId: SchedulerTargetIdBrand(instance.id.toString()),
       targetParams: null,
       decision: "checkpoint_repair",
       reason: `Checkpoint rebuilt at materialization ${result.materializationId ?? "none"}`,
@@ -678,7 +715,10 @@ export class AssetEngine {
 
   private async resolveDependencies(
     params: AssetParams,
-    options: { memo: Map<bigint, Promise<MaterializationOutcome>>; plannerRunId: string },
+    options: {
+      memo: Map<AssetInstanceId, Promise<MaterializationOutcome>>;
+      plannerRunId: PlannerRunId;
+    },
   ): Promise<ResolvedDependency[] | null> {
     const definition = getAssetDefinition(params.assetSlug);
     const specs = definition.dependencies(params);
@@ -704,8 +744,8 @@ export class AssetEngine {
       });
       if (!outcome.materializationId || outcome.outputRevision === null) {
         await this.recordDecision({
-          jobId: "asset_engine",
-          targetId: instance.id.toString(),
+          jobId: ASSET_ENGINE_JOB_ID,
+          targetId: SchedulerTargetIdBrand(instance.id.toString()),
           targetParams: formatAssetParams(spec.params),
           decision: "dependency_failed",
           reason: "Dependency materialization failed",
@@ -731,16 +771,16 @@ export class AssetEngine {
 
   private async ensureIngests(
     requirements: IngestRequirement[],
-    params: { plannerRunId: string; paramsLabel: string },
+    params: { plannerRunId: PlannerRunId; paramsLabel: string },
   ): Promise<boolean> {
     if (requirements.length === 0) return true;
 
-    const followers = new Set<bigint>();
-    const followings = new Set<bigint>();
-    const posts = new Set<bigint>();
-    const postsRequestedBy = new Set<bigint>();
-    const followersIncremental = new Set<bigint>();
-    const followingsIncremental = new Set<bigint>();
+    const followers = new Set<UserId>();
+    const followings = new Set<UserId>();
+    const posts = new Set<UserId>();
+    const postsRequestedBy = new Set<AssetMaterializationId>();
+    const followersIncremental = new Set<UserId>();
+    const followingsIncremental = new Set<UserId>();
 
     for (const requirement of requirements) {
       if (requirement.ingestKind === "twitterio_api_user_followers") {
@@ -821,7 +861,7 @@ export class AssetEngine {
           : "ingest_failed";
       const reason = error instanceof Error ? error.message : "Unknown ingest error";
       await this.recordDecision({
-        jobId: "asset_engine",
+        jobId: ASSET_ENGINE_JOB_ID,
         targetId: null,
         targetParams: params.paramsLabel,
         decision,
@@ -895,15 +935,15 @@ export class AssetEngine {
 
   private async withIngestLock<T>(
     lockKey: string,
-    params: { plannerRunId: string; paramsLabel: string; targetId: bigint | null },
+    params: { plannerRunId: PlannerRunId; paramsLabel: string; targetId: UserId | null },
     run: () => Promise<T>,
   ): Promise<T | null> {
     return this.db.connection().execute(async (conn) => {
       const acquired = await acquireAdvisoryLock(conn, lockKey, { timeoutMs: this.lockTimeoutMs });
       if (!acquired) {
         await this.recordDecision({
-          jobId: "asset_engine",
-          targetId: params.targetId ? params.targetId.toString() : null,
+          jobId: ASSET_ENGINE_JOB_ID,
+          targetId: params.targetId ? SchedulerTargetIdBrand(params.targetId.toString()) : null,
           targetParams: params.paramsLabel,
           decision: "ingest_lock_timeout",
           reason: "Failed to acquire ingest lock",
@@ -954,14 +994,14 @@ export class AssetEngine {
         };
       }
       default:
-        throw new Error("Unknown asset slug");
+        return assertNever(record, "Unknown asset slug");
     }
   }
 
   private async computeInputsHash(
     definition: ReturnType<typeof getAssetDefinition>,
     params: AssetParams,
-    instanceId: bigint,
+    instanceId: AssetInstanceId,
   ): Promise<{ hash: string; version: HashVersion }> {
     const parts: string[] = [
       "kind=inputs_hash:v1",
@@ -975,12 +1015,12 @@ export class AssetEngine {
   }
 
   private async recordDecision(input: {
-    jobId: string;
-    targetId: string | null;
+    jobId: SchedulerJobId;
+    targetId: SchedulerTargetId | null;
     targetParams: string | null;
     decision: string;
     reason?: string | null;
-    plannerRunId: string;
+    plannerRunId: PlannerRunId;
   }): Promise<void> {
     await recordPlannerEvent(this.db, {
       jobId: input.jobId,
@@ -991,6 +1031,14 @@ export class AssetEngine {
       plannerRunId: input.plannerRunId,
     });
   }
+}
+
+function asUserIds(items: AssetItemId[]): UserId[] {
+  return items as UserId[];
+}
+
+function asPostIds(items: AssetItemId[]): PostId[] {
+  return items as PostId[];
 }
 
 function computeDependencyRevisionsHash(deps: ResolvedDependency[]): {

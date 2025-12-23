@@ -1,8 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import {
-  type StartedPostgreSqlContainer,
-  PostgreSqlContainer,
-} from "@testcontainers/postgresql";
+import { type StartedPostgreSqlContainer, PostgreSqlContainer } from "@testcontainers/postgresql";
 import {
   createDb,
   destroyDb,
@@ -11,6 +8,7 @@ import {
   migrateToLatest,
   type Db,
 } from "@bdx/db";
+import { UserId } from "@bdx/ids";
 import AssetsRootsDisable from "./roots/disable.js";
 import AssetsRootsEnable from "./roots/enable.js";
 
@@ -77,14 +75,17 @@ describe("CLI asset roots", () => {
   });
 
   it("enables and disables roots via the CLI", async () => {
-    await AssetsRootsEnable.run([
-      "--slug",
-      "segment_specified_users",
-      "--params",
-      JSON.stringify({ stableKey: "cli-roots" }),
-      "--specified-user-ids",
-      "101,102",
-    ], cliRootUrl);
+    await AssetsRootsEnable.run(
+      [
+        "--slug",
+        "segment_specified_users",
+        "--params",
+        JSON.stringify({ stableKey: "cli-roots" }),
+        "--specified-user-ids",
+        "101,102",
+      ],
+      cliRootUrl,
+    );
 
     const roots = await listEnabledAssetInstanceRoots(db);
     expect(roots).toHaveLength(1);
@@ -94,7 +95,7 @@ describe("CLI asset roots", () => {
     }
 
     const specifiedUsers = await listSpecifiedUsersInputs(db, root.instanceId);
-    expect(specifiedUsers).toEqual([101n, 102n]);
+    expect(specifiedUsers).toEqual([UserId(101n), UserId(102n)]);
 
     await AssetsRootsDisable.run(["--instance-id", root.instanceId.toString()], cliRootUrl);
 

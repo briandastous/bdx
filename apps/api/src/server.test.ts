@@ -3,6 +3,7 @@ import { type StartedPostgreSqlContainer, PostgreSqlContainer } from "@testconta
 import { createDb, destroyDb, migrateToLatest, type Db } from "@bdx/db";
 import { createPinoOptions } from "@bdx/observability";
 import { TwitterApiClient, type XUserData } from "@bdx/twitterapi-io";
+import { UserId } from "@bdx/ids";
 import { buildServer } from "./server.js";
 
 class StubTwitterApiClient extends TwitterApiClient {
@@ -65,12 +66,12 @@ describe("webhook ingestion", () => {
       loggerOptions: createPinoOptions({ env: "test", level: "silent", service: "api" }),
       webhookToken: "secret",
       twitterClient: new StubTwitterApiClient(profile),
-      xSelf: { userId: 555n, handle: "target" },
+      xSelf: { userId: UserId(555n), handle: "target" },
     });
   }
 
   const followerProfile: XUserData = {
-    userId: 777n,
+    userId: UserId(777n),
     userName: "follower",
     displayName: "Follower",
     profileUrl: null,
@@ -156,7 +157,9 @@ describe("webhook ingestion", () => {
       .selectFrom("follows")
       .select(["target_id", "follower_id", "is_deleted"])
       .execute();
-    expect(followRows).toEqual([{ target_id: 555n, follower_id: 777n, is_deleted: false }]);
+    expect(followRows).toEqual([
+      { target_id: UserId(555n), follower_id: UserId(777n), is_deleted: false },
+    ]);
 
     await server.close();
   });

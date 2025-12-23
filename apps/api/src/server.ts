@@ -7,8 +7,10 @@ import {
   listEnabledAssetInstanceFanoutRootsWithDetails,
   listEnabledAssetInstanceRootsWithDetails,
 } from "@bdx/db";
+import type { UserId } from "@bdx/ids";
+import { parseAssetMaterializationId, parseIngestEventId } from "@bdx/ids";
 import type { PinoLoggerOptions } from "@bdx/observability";
-import Fastify from "fastify";
+import Fastify, { type FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
   OpenAPIRegistry,
@@ -181,9 +183,9 @@ const rootsResponseSchema = z.object({
   ),
 });
 
-function parseIdParam(params: unknown): bigint {
+function parseIdParam<T>(params: unknown, parser: (value: string) => T): T {
   const parsed = idParamSchema.parse(params);
-  return BigInt(parsed.id);
+  return parser(parsed.id);
 }
 
 function toIsoString(value: Date | null): string | null {
@@ -211,8 +213,8 @@ export function buildServer(params: {
   loggerOptions: PinoLoggerOptions;
   webhookToken: string;
   twitterClient: TwitterApiClient;
-  xSelf: { userId: bigint; handle: string };
-}) {
+  xSelf: { userId: UserId; handle: string };
+}): FastifyInstance {
   const server = Fastify({
     logger: params.loggerOptions,
   });
@@ -446,7 +448,7 @@ export function buildServer(params: {
   });
 
   server.get("/v1/ingest/followers/:id", async (request, reply) => {
-    const ingestEventId = parseIdParam(request.params);
+    const ingestEventId = parseIdParam(request.params, parseIngestEventId);
     const record = await getFollowersSyncRunById(params.db, ingestEventId);
     if (!record) {
       return reply.status(404).send({ error: "not_found" });
@@ -469,7 +471,7 @@ export function buildServer(params: {
   });
 
   server.get("/v1/ingest/followings/:id", async (request, reply) => {
-    const ingestEventId = parseIdParam(request.params);
+    const ingestEventId = parseIdParam(request.params, parseIngestEventId);
     const record = await getFollowingsSyncRunById(params.db, ingestEventId);
     if (!record) {
       return reply.status(404).send({ error: "not_found" });
@@ -492,7 +494,7 @@ export function buildServer(params: {
   });
 
   server.get("/v1/ingest/posts/:id", async (request, reply) => {
-    const ingestEventId = parseIdParam(request.params);
+    const ingestEventId = parseIdParam(request.params, parseIngestEventId);
     const record = await getPostsSyncRunById(params.db, ingestEventId);
     if (!record) {
       return reply.status(404).send({ error: "not_found" });
@@ -515,7 +517,7 @@ export function buildServer(params: {
   });
 
   server.get("/v1/materializations/:id", async (request, reply) => {
-    const materializationId = parseIdParam(request.params);
+    const materializationId = parseIdParam(request.params, parseAssetMaterializationId);
     const record = await getAssetMaterializationById(params.db, materializationId);
     if (!record) {
       return reply.status(404).send({ error: "not_found" });

@@ -3,21 +3,20 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
+import { UserId } from "@bdx/ids";
 
 const nodeEnvSchema = z.enum(["development", "test", "production"]).default("development");
 const deployEnvSchema = z.enum(["development", "staging", "production"]);
 const logLevelSchema = z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]);
-const bigintSchema = z
-  .union([z.string(), z.number().int(), z.bigint()])
-  .transform((value) => {
-    if (typeof value === "bigint") return value;
-    if (typeof value === "number") return BigInt(value);
-    const trimmed = value.trim();
-    if (trimmed.length === 0) {
-      throw new Error("Expected a bigint string");
-    }
-    return BigInt(trimmed);
-  });
+const bigintSchema = z.union([z.string(), z.number().int(), z.bigint()]).transform((value) => {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number") return BigInt(value);
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    throw new Error("Expected a bigint string");
+  }
+  return BigInt(trimmed);
+});
 
 export type NodeEnv = z.infer<typeof nodeEnvSchema>;
 export type DeployEnv = z.infer<typeof deployEnvSchema>;
@@ -170,7 +169,7 @@ export interface DbConfig {
 }
 
 export interface XSelfConfig {
-  userId: bigint;
+  userId: UserId;
   handle: string;
 }
 
@@ -278,17 +277,19 @@ function loadYamlConfig(params: { deployEnv: DeployEnv; nodeEnv: NodeEnv }): Yam
   return yamlConfigSchema.parse(deepMerge(baseRaw, envRaw));
 }
 
-function resolveDeployEnv(params: { nodeEnv: NodeEnv; deployEnv: DeployEnv | undefined }): DeployEnv {
+function resolveDeployEnv(params: {
+  nodeEnv: NodeEnv;
+  deployEnv: DeployEnv | undefined;
+}): DeployEnv {
   if (params.deployEnv) return params.deployEnv;
   return params.nodeEnv === "production" ? "production" : "development";
 }
 
-const baseEnvSchema = z
-  .object({
-    NODE_ENV: nodeEnvSchema,
-    DEPLOY_ENV: deployEnvSchema.optional(),
-    DATABASE_URL: z.string().min(1),
-  });
+const baseEnvSchema = z.object({
+  NODE_ENV: nodeEnvSchema,
+  DEPLOY_ENV: deployEnvSchema.optional(),
+  DATABASE_URL: z.string().min(1),
+});
 
 const baseOverridesEnvSchema = z.object({ LOG_LEVEL: logLevelSchema.optional() });
 const dbOverridesEnvSchema = z
@@ -348,7 +349,7 @@ function resolveXSelfConfig(yaml: YamlConfig, env: NodeJS.ProcessEnv): XSelfConf
     );
   }
 
-  return { userId, handle };
+  return { userId: UserId(userId), handle };
 }
 
 function resolveTwitterApiConfig(
@@ -433,7 +434,12 @@ const optionalBooleanFromString = z
   .optional()
   .transform((value) => (value === undefined ? undefined : value.trim().toLowerCase()))
   .refine(
-    (value) => value === undefined || value === "true" || value === "false" || value === "1" || value === "0",
+    (value) =>
+      value === undefined ||
+      value === "true" ||
+      value === "false" ||
+      value === "1" ||
+      value === "0",
     { message: "Expected a boolean string (true/false/1/0)" },
   )
   .transform((value) => (value === undefined ? undefined : value === "true" || value === "1"));

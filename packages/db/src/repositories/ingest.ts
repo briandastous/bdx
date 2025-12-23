@@ -2,22 +2,24 @@ import type { DbOrTx } from "../db.js";
 import type { FollowsSyncMode, IngestKind, JsonValue, SyncRunStatus } from "../database.js";
 import { withTransaction } from "../transactions.js";
 import { ensureUser } from "./users.js";
+import type { AssetMaterializationId, IngestEventId, UserId } from "@bdx/ids";
+import { IngestEventId as IngestEventIdBrand, UserId as UserIdBrand } from "@bdx/ids";
 
 export interface IngestEventRecord {
-  id: bigint;
+  id: IngestEventId;
   ingestKind: IngestKind;
   createdAt: Date;
 }
 
 export interface FollowersSyncRunInput {
-  targetUserId: bigint;
+  targetUserId: UserId;
   ingestKind: IngestKind;
   syncMode: FollowsSyncMode;
   status?: SyncRunStatus;
 }
 
 export interface FollowingsSyncRunInput {
-  sourceUserId: bigint;
+  sourceUserId: UserId;
   ingestKind: IngestKind;
   syncMode: FollowsSyncMode;
   status?: SyncRunStatus;
@@ -43,15 +45,15 @@ export interface PostsSyncRunUpdateInput extends SyncRunUpdateInput {
 }
 
 export interface WebhookFollowEventInput {
-  targetUserId: bigint;
-  followerUserId: bigint | null;
+  targetUserId: UserId;
+  followerUserId: UserId | null;
   followerHandle: string | null;
   rawPayload: JsonValue | null;
 }
 
 export interface FollowersSyncRunRecord {
-  ingestEventId: bigint;
-  targetUserId: bigint;
+  ingestEventId: IngestEventId;
+  targetUserId: UserId;
   status: SyncRunStatus;
   syncMode: FollowsSyncMode;
   completedAt: Date | null;
@@ -59,8 +61,8 @@ export interface FollowersSyncRunRecord {
 }
 
 export interface FollowingsSyncRunRecord {
-  ingestEventId: bigint;
-  sourceUserId: bigint;
+  ingestEventId: IngestEventId;
+  sourceUserId: UserId;
   status: SyncRunStatus;
   syncMode: FollowsSyncMode;
   completedAt: Date | null;
@@ -68,7 +70,7 @@ export interface FollowingsSyncRunRecord {
 }
 
 export interface PostsSyncRunRecord {
-  ingestEventId: bigint;
+  ingestEventId: IngestEventId;
   status: SyncRunStatus;
   completedAt: Date | null;
   cursorExhausted: boolean;
@@ -76,10 +78,10 @@ export interface PostsSyncRunRecord {
 }
 
 export interface FollowersSyncRunDetail {
-  ingestEventId: bigint;
+  ingestEventId: IngestEventId;
   ingestKind: IngestKind;
   createdAt: Date;
-  targetUserId: bigint;
+  targetUserId: UserId;
   status: SyncRunStatus;
   syncMode: FollowsSyncMode;
   completedAt: Date | null;
@@ -91,10 +93,10 @@ export interface FollowersSyncRunDetail {
 }
 
 export interface FollowingsSyncRunDetail {
-  ingestEventId: bigint;
+  ingestEventId: IngestEventId;
   ingestKind: IngestKind;
   createdAt: Date;
-  sourceUserId: bigint;
+  sourceUserId: UserId;
   status: SyncRunStatus;
   syncMode: FollowsSyncMode;
   completedAt: Date | null;
@@ -106,7 +108,7 @@ export interface FollowingsSyncRunDetail {
 }
 
 export interface PostsSyncRunDetail {
-  ingestEventId: bigint;
+  ingestEventId: IngestEventId;
   ingestKind: IngestKind;
   createdAt: Date;
   status: SyncRunStatus;
@@ -117,7 +119,7 @@ export interface PostsSyncRunDetail {
   lastApiError: string | null;
   lastHttpRequest: JsonValue | null;
   lastHttpResponse: JsonValue | null;
-  targetUserIds: bigint[];
+  targetUserIds: UserId[];
 }
 
 async function createIngestEvent(db: DbOrTx, ingestKind: IngestKind): Promise<IngestEventRecord> {
@@ -128,7 +130,7 @@ async function createIngestEvent(db: DbOrTx, ingestKind: IngestKind): Promise<In
     .executeTakeFirstOrThrow();
 
   return {
-    id: record.id,
+    id: IngestEventIdBrand(record.id),
     ingestKind: record.ingest_kind,
     createdAt: record.created_at,
   };
@@ -224,7 +226,7 @@ function buildSyncRunUpdate(input: SyncRunUpdateInput): SyncRunUpdateRow {
 
 export async function updateFollowersSyncRun(
   db: DbOrTx,
-  ingestEventId: bigint,
+  ingestEventId: IngestEventId,
   input: SyncRunUpdateInput,
 ): Promise<number> {
   const update = buildSyncRunUpdate(input);
@@ -241,7 +243,7 @@ export async function updateFollowersSyncRun(
 
 export async function updateFollowingsSyncRun(
   db: DbOrTx,
-  ingestEventId: bigint,
+  ingestEventId: IngestEventId,
   input: SyncRunUpdateInput,
 ): Promise<number> {
   const update = buildSyncRunUpdate(input);
@@ -258,7 +260,7 @@ export async function updateFollowingsSyncRun(
 
 export async function updatePostsSyncRun(
   db: DbOrTx,
-  ingestEventId: bigint,
+  ingestEventId: IngestEventId,
   input: PostsSyncRunUpdateInput,
 ): Promise<number> {
   const update = buildSyncRunUpdate(input);
@@ -276,7 +278,7 @@ export async function updatePostsSyncRun(
 
 export async function getLatestFollowersSyncRun(
   db: DbOrTx,
-  params: { targetUserId: bigint; status?: SyncRunStatus; syncMode?: FollowsSyncMode },
+  params: { targetUserId: UserId; status?: SyncRunStatus; syncMode?: FollowsSyncMode },
 ): Promise<FollowersSyncRunRecord | null> {
   let query = db
     .selectFrom("followers_sync_runs")
@@ -301,8 +303,8 @@ export async function getLatestFollowersSyncRun(
   if (!record) return null;
 
   return {
-    ingestEventId: record.ingest_event_id,
-    targetUserId: record.target_user_id,
+    ingestEventId: IngestEventIdBrand(record.ingest_event_id),
+    targetUserId: UserIdBrand(record.target_user_id),
     status: record.status,
     syncMode: record.sync_mode,
     completedAt: record.completed_at,
@@ -312,7 +314,7 @@ export async function getLatestFollowersSyncRun(
 
 export async function getLatestFollowingsSyncRun(
   db: DbOrTx,
-  params: { sourceUserId: bigint; status?: SyncRunStatus; syncMode?: FollowsSyncMode },
+  params: { sourceUserId: UserId; status?: SyncRunStatus; syncMode?: FollowsSyncMode },
 ): Promise<FollowingsSyncRunRecord | null> {
   let query = db
     .selectFrom("followings_sync_runs")
@@ -337,8 +339,8 @@ export async function getLatestFollowingsSyncRun(
   if (!record) return null;
 
   return {
-    ingestEventId: record.ingest_event_id,
-    sourceUserId: record.source_user_id,
+    ingestEventId: IngestEventIdBrand(record.ingest_event_id),
+    sourceUserId: UserIdBrand(record.source_user_id),
     status: record.status,
     syncMode: record.sync_mode,
     completedAt: record.completed_at,
@@ -348,7 +350,7 @@ export async function getLatestFollowingsSyncRun(
 
 export async function getLatestPostsSyncRun(
   db: DbOrTx,
-  params: { targetUserId?: bigint; status?: SyncRunStatus },
+  params: { targetUserId?: UserId; status?: SyncRunStatus },
 ): Promise<PostsSyncRunRecord | null> {
   let query = db
     .selectFrom("posts_sync_runs")
@@ -382,7 +384,7 @@ export async function getLatestPostsSyncRun(
   if (!record) return null;
 
   return {
-    ingestEventId: record.ingest_event_id,
+    ingestEventId: IngestEventIdBrand(record.ingest_event_id),
     status: record.status,
     completedAt: record.completed_at,
     cursorExhausted: record.cursor_exhausted,
@@ -392,8 +394,8 @@ export async function getLatestPostsSyncRun(
 
 export async function addPostsSyncRunTargetUsers(
   db: DbOrTx,
-  ingestEventId: bigint,
-  targetUserIds: bigint[],
+  ingestEventId: IngestEventId,
+  targetUserIds: UserId[],
 ): Promise<number> {
   if (targetUserIds.length === 0) return 0;
 
@@ -440,8 +442,8 @@ export async function insertWebhookFollowEvent(
 
 export async function linkPostsSyncRunToMaterializations(
   db: DbOrTx,
-  ingestEventId: bigint,
-  materializationIds: bigint[],
+  ingestEventId: IngestEventId,
+  materializationIds: AssetMaterializationId[],
 ): Promise<number> {
   if (materializationIds.length === 0) return 0;
 
@@ -463,7 +465,7 @@ export async function linkPostsSyncRunToMaterializations(
 
 export async function getFollowersSyncRunById(
   db: DbOrTx,
-  ingestEventId: bigint,
+  ingestEventId: IngestEventId,
 ): Promise<FollowersSyncRunDetail | null> {
   const row = await db
     .selectFrom("followers_sync_runs")
@@ -488,10 +490,10 @@ export async function getFollowersSyncRunById(
   if (!row) return null;
 
   return {
-    ingestEventId: row.ingest_event_id,
+    ingestEventId: IngestEventIdBrand(row.ingest_event_id),
     ingestKind: row.ingest_kind,
     createdAt: row.created_at,
-    targetUserId: row.target_user_id,
+    targetUserId: UserIdBrand(row.target_user_id),
     status: row.status,
     syncMode: row.sync_mode,
     completedAt: row.completed_at,
@@ -505,7 +507,7 @@ export async function getFollowersSyncRunById(
 
 export async function getFollowingsSyncRunById(
   db: DbOrTx,
-  ingestEventId: bigint,
+  ingestEventId: IngestEventId,
 ): Promise<FollowingsSyncRunDetail | null> {
   const row = await db
     .selectFrom("followings_sync_runs")
@@ -530,10 +532,10 @@ export async function getFollowingsSyncRunById(
   if (!row) return null;
 
   return {
-    ingestEventId: row.ingest_event_id,
+    ingestEventId: IngestEventIdBrand(row.ingest_event_id),
     ingestKind: row.ingest_kind,
     createdAt: row.created_at,
-    sourceUserId: row.source_user_id,
+    sourceUserId: UserIdBrand(row.source_user_id),
     status: row.status,
     syncMode: row.sync_mode,
     completedAt: row.completed_at,
@@ -547,7 +549,7 @@ export async function getFollowingsSyncRunById(
 
 export async function getPostsSyncRunById(
   db: DbOrTx,
-  ingestEventId: bigint,
+  ingestEventId: IngestEventId,
 ): Promise<PostsSyncRunDetail | null> {
   const row = await db
     .selectFrom("posts_sync_runs")
@@ -578,7 +580,7 @@ export async function getPostsSyncRunById(
     .execute();
 
   return {
-    ingestEventId: row.ingest_event_id,
+    ingestEventId: IngestEventIdBrand(row.ingest_event_id),
     ingestKind: row.ingest_kind,
     createdAt: row.created_at,
     status: row.status,
@@ -589,6 +591,6 @@ export async function getPostsSyncRunById(
     lastApiError: row.last_api_error,
     lastHttpRequest: row.last_http_request,
     lastHttpResponse: row.last_http_response,
-    targetUserIds: targetRows.map((target) => target.target_user_id),
+    targetUserIds: targetRows.map((target) => UserIdBrand(target.target_user_id)),
   };
 }

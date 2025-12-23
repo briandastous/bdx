@@ -7,6 +7,7 @@ import type {
   UserProfileInput,
   UsersMetaInput,
 } from "@bdx/db";
+import type { IngestEventId, PostId, UserId } from "@bdx/ids";
 import {
   addPostsSyncRunTargetUsers,
   createPostsSyncRun,
@@ -53,10 +54,10 @@ export class PostsSyncRateLimitError extends PostsSyncError {
 }
 
 export interface PostsSyncResult {
-  syncRunId: bigint;
-  targetUserIds: bigint[];
+  syncRunId: IngestEventId;
+  targetUserIds: readonly UserId[];
   postCount: number;
-  postIds: bigint[];
+  postIds: readonly PostId[];
   cursorExhausted: boolean;
   syncedSince: Date | null;
 }
@@ -85,12 +86,12 @@ export class PostsSyncService {
     this.httpSnapshotMaxBytes = resolveHttpBodyMaxBytes(params.httpSnapshotMaxBytes);
   }
 
-  async syncPostsFull(params: { userIds: Iterable<bigint> }): Promise<PostsSyncResult> {
+  async syncPostsFull(params: { userIds: Iterable<UserId> }): Promise<PostsSyncResult> {
     return this.syncPosts({ userIds: params.userIds, since: null });
   }
 
   async syncPostsIncremental(params: {
-    userIds: Iterable<bigint>;
+    userIds: Iterable<UserId>;
     since: Date;
   }): Promise<PostsSyncResult> {
     if (!Number.isFinite(params.since.getTime())) {
@@ -100,7 +101,7 @@ export class PostsSyncService {
   }
 
   private async syncPosts(params: {
-    userIds: Iterable<bigint>;
+    userIds: Iterable<UserId>;
     since: Date | null;
   }): Promise<PostsSyncResult> {
     const uniqueUserIds = normalizeUserIds(params.userIds);
@@ -123,7 +124,7 @@ export class PostsSyncService {
       "Starting posts sync",
     );
 
-    let profiles: Map<bigint, XUserData>;
+    let profiles: Map<UserId, XUserData>;
     try {
       profiles = await this.loadProfiles(uniqueUserIds);
     } catch (error) {
@@ -131,7 +132,7 @@ export class PostsSyncService {
       throw this.unwrapError(error);
     }
 
-    const targetHandles = new Map<bigint, string>();
+    const targetHandles = new Map<UserId, string>();
     const userUpdates: UserProfileInput[] = [];
 
     for (const profile of profiles.values()) {
@@ -201,8 +202,8 @@ export class PostsSyncService {
 
     const postsRows: PostInput[] = [];
     const postsMetaRows: PostsMetaInput[] = [];
-    const usersMetaRows = new Map<bigint, UsersMetaInput>();
-    const seenPostIds = new Set<bigint>();
+    const usersMetaRows = new Map<UserId, UsersMetaInput>();
+    const seenPostIds = new Set<PostId>();
     let cursorExhausted = true;
 
     try {
@@ -339,13 +340,13 @@ export class PostsSyncService {
     return result;
   }
 
-  private async loadProfiles(userIds: bigint[]): Promise<Map<bigint, XUserData>> {
-    const profiles = new Map<bigint, XUserData>();
+  private async loadProfiles(userIds: UserId[]): Promise<Map<UserId, XUserData>> {
+    const profiles = new Map<UserId, XUserData>();
     for (const userId of userIds) {
       try {
         const profile = await this.client.fetchUserProfileById(userId);
         if (profile?.userId == null) {
-          throw new PostsSyncError(`Unable to load profile for user id '${userId}'`, {
+          throw new PostsSyncError(`Unable to load profile for user id '${userId.toString()}'`, {
             status: "user-info",
           });
         }
@@ -366,7 +367,7 @@ export class PostsSyncService {
     return profiles;
   }
 
-  private buildQueries(userIds: bigint[], handles: Map<bigint, string>): string[] {
+  private buildQueries(userIds: UserId[], handles: Map<UserId, string>): string[] {
     if (userIds.length === 0) return [];
 
     const queries: string[] = [];
@@ -377,7 +378,9 @@ export class PostsSyncService {
     for (const userId of userIds) {
       const handle = handles.get(userId);
       if (!handle) {
-        throw new PostsSyncError(`Missing handle for user id '${userId}'`, { status: "user-info" });
+        throw new PostsSyncError(`Missing handle for user id '${userId.toString()}'`, {
+          status: "user-info",
+        });
       }
       const token = `from:${handle}`;
       const candidate = buildQuery([...currentTokens, token]);
@@ -410,18 +413,18 @@ export class PostsSyncService {
 
   private processPage(
     posts: Iterable<TweetData>,
-    syncRunId: bigint,
+    syncRunId: IngestEventId,
   ): {
     postRows: PostInput[];
     metaRows: PostsMetaInput[];
-    usersMeta: Map<bigint, UsersMetaInput>;
-    postIds: Set<bigint>;
+    usersMeta: Map<UserId, UsersMetaInput>;
+    postIds: Set<PostId>;
   } {
     const now = new Date();
     const postRows: PostInput[] = [];
     const metaRows: PostsMetaInput[] = [];
-    const usersMeta = new Map<bigint, UsersMetaInput>();
-    const postIds = new Set<bigint>();
+    const usersMeta = new Map<UserId, UsersMetaInput>();
+    const postIds = new Set<PostId>();
 
     for (const post of posts) {
       postIds.add(post.postId);
@@ -450,7 +453,7 @@ export class PostsSyncService {
   }
 
   private async recordFailure(
-    syncRunId: bigint,
+    syncRunId: IngestEventId,
     error: unknown,
     syncedSince: Date | null,
   ): Promise<void> {
@@ -484,8 +487,8 @@ export class PostsSyncService {
   }
 }
 
-function normalizeUserIds(userIds: Iterable<bigint>): bigint[] {
-  const unique = new Set<bigint>();
+function normalizeUserIds(userIds: Iterable<UserId>): UserId[] {
+  const unique = new Set<UserId>();
   for (const userId of userIds) {
     unique.add(userId);
   }

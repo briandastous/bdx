@@ -13,9 +13,12 @@ import {
   paramsHashV1,
   type AssetParams,
 } from "@bdx/engine";
+import type { AssetParamsId } from "@bdx/ids";
 import { parseJson } from "./parsers.js";
 
-const assetSlugSet = new Set<AssetSlug>(listAssetDefinitions().map((definition) => definition.slug));
+const assetSlugSet = new Set<AssetSlug>(
+  listAssetDefinitions().map((definition) => definition.slug),
+);
 
 export function resolveAssetSlug(value: string): AssetSlug {
   if (!assetSlugSet.has(value as AssetSlug)) {
@@ -40,12 +43,15 @@ export function formatAssetParamsForLog(params: AssetParams): string {
 }
 
 type AssetParamsResolution = {
-  paramsId: bigint;
+  paramsId: AssetParamsId;
   paramsHash: string;
   paramsHashVersion: number;
 };
 
-async function ensureAssetParamsRecord(db: Db, params: AssetParams): Promise<AssetParamsResolution> {
+async function ensureAssetParamsRecord(
+  db: Db,
+  params: AssetParams,
+): Promise<AssetParamsResolution> {
   const paramsHash = paramsHashV1(params);
   const paramsHashVersion = PARAMS_HASH_VERSION;
 
@@ -92,7 +98,10 @@ async function ensureAssetParamsRecord(db: Db, params: AssetParams): Promise<Ass
   }
 }
 
-export async function ensureAssetInstance(db: Db, params: AssetParams): Promise<AssetInstanceRecord> {
+export async function ensureAssetInstance(
+  db: Db,
+  params: AssetParams,
+): Promise<AssetInstanceRecord> {
   const resolved = await ensureAssetParamsRecord(db, params);
   return getOrCreateAssetInstance(db, {
     paramsId: resolved.paramsId,

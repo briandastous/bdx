@@ -1,10 +1,16 @@
 import type { DbOrTx } from "../../db.js";
 import type { AssetInstanceFanoutMode, AssetSlug } from "../../database.js";
 import { joinAssetInstances } from "../../queries/joins.js";
+import type { AssetInstanceFanoutRootId, AssetInstanceId, AssetInstanceRootId } from "@bdx/ids";
+import {
+  AssetInstanceFanoutRootId as AssetInstanceFanoutRootIdBrand,
+  AssetInstanceId as AssetInstanceIdBrand,
+  AssetInstanceRootId as AssetInstanceRootIdBrand,
+} from "@bdx/ids";
 
 export interface AssetInstanceRootRecord {
-  id: bigint;
-  instanceId: bigint;
+  id: AssetInstanceRootId;
+  instanceId: AssetInstanceId;
   createdAt: Date;
   disabledAt: Date | null;
 }
@@ -16,8 +22,8 @@ export interface AssetInstanceRootWithDetails extends AssetInstanceRootRecord {
 }
 
 export interface AssetInstanceFanoutRootRecord {
-  id: bigint;
-  sourceInstanceId: bigint;
+  id: AssetInstanceFanoutRootId;
+  sourceInstanceId: AssetInstanceId;
   targetAssetSlug: AssetSlug;
   fanoutMode: AssetInstanceFanoutMode;
   createdAt: Date;
@@ -41,8 +47,8 @@ export async function listEnabledAssetInstanceRoots(
     .execute();
 
   return rows.map((row) => ({
-    id: row.id,
-    instanceId: row.instance_id,
+    id: AssetInstanceRootIdBrand(row.id),
+    instanceId: AssetInstanceIdBrand(row.instance_id),
     createdAt: row.created_at,
     disabledAt: row.disabled_at,
   }));
@@ -69,8 +75,8 @@ export async function listEnabledAssetInstanceRootsWithDetails(
     .execute();
 
   return rows.map((row) => ({
-    id: row.root_id,
-    instanceId: row.instance_id,
+    id: AssetInstanceRootIdBrand(row.root_id),
+    instanceId: AssetInstanceIdBrand(row.instance_id),
     createdAt: row.created_at,
     disabledAt: row.disabled_at,
     assetSlug: row.asset_slug,
@@ -97,8 +103,8 @@ export async function listEnabledAssetInstanceFanoutRoots(
     .execute();
 
   return rows.map((row) => ({
-    id: row.id,
-    sourceInstanceId: row.source_instance_id,
+    id: AssetInstanceFanoutRootIdBrand(row.id),
+    sourceInstanceId: AssetInstanceIdBrand(row.source_instance_id),
     targetAssetSlug: row.target_asset_slug,
     fanoutMode: row.fanout_mode,
     createdAt: row.created_at,
@@ -129,8 +135,8 @@ export async function listEnabledAssetInstanceFanoutRootsWithDetails(
     .execute();
 
   return rows.map((row) => ({
-    id: row.root_id,
-    sourceInstanceId: row.source_instance_id,
+    id: AssetInstanceFanoutRootIdBrand(row.root_id),
+    sourceInstanceId: AssetInstanceIdBrand(row.source_instance_id),
     targetAssetSlug: row.target_asset_slug,
     fanoutMode: row.fanout_mode,
     createdAt: row.created_at,
@@ -143,7 +149,7 @@ export async function listEnabledAssetInstanceFanoutRootsWithDetails(
 
 export async function enableAssetInstanceRoot(
   db: DbOrTx,
-  instanceId: bigint,
+  instanceId: AssetInstanceId,
 ): Promise<AssetInstanceRootRecord> {
   const row =
     (await db
@@ -159,14 +165,17 @@ export async function enableAssetInstanceRoot(
       .executeTakeFirstOrThrow());
 
   return {
-    id: row.id,
-    instanceId: row.instance_id,
+    id: AssetInstanceRootIdBrand(row.id),
+    instanceId: AssetInstanceIdBrand(row.instance_id),
     createdAt: row.created_at,
     disabledAt: row.disabled_at,
   };
 }
 
-export async function disableAssetInstanceRoot(db: DbOrTx, instanceId: bigint): Promise<number> {
+export async function disableAssetInstanceRoot(
+  db: DbOrTx,
+  instanceId: AssetInstanceId,
+): Promise<number> {
   const result = await db
     .updateTable("asset_instance_roots")
     .set({ disabled_at: new Date() })
@@ -179,7 +188,7 @@ export async function disableAssetInstanceRoot(db: DbOrTx, instanceId: bigint): 
 export async function enableAssetInstanceFanoutRoot(
   db: DbOrTx,
   params: {
-    sourceInstanceId: bigint;
+    sourceInstanceId: AssetInstanceId;
     targetAssetSlug: AssetSlug;
     fanoutMode: AssetInstanceFanoutMode;
   },
@@ -223,8 +232,8 @@ export async function enableAssetInstanceFanoutRoot(
       .executeTakeFirstOrThrow());
 
   return {
-    id: row.id,
-    sourceInstanceId: row.source_instance_id,
+    id: AssetInstanceFanoutRootIdBrand(row.id),
+    sourceInstanceId: AssetInstanceIdBrand(row.source_instance_id),
     targetAssetSlug: row.target_asset_slug,
     fanoutMode: row.fanout_mode,
     createdAt: row.created_at,
@@ -235,7 +244,7 @@ export async function enableAssetInstanceFanoutRoot(
 export async function disableAssetInstanceFanoutRoot(
   db: DbOrTx,
   params: {
-    sourceInstanceId: bigint;
+    sourceInstanceId: AssetInstanceId;
     targetAssetSlug: AssetSlug;
     fanoutMode: AssetInstanceFanoutMode;
   },

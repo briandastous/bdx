@@ -1,4 +1,5 @@
 import type { Db, IngestKind } from "@bdx/db";
+import type { IngestEventId, UserId } from "@bdx/ids";
 import {
   createFollowingsSyncRun,
   getActiveFollowedIds,
@@ -14,11 +15,11 @@ import type { GraphSyncOrientation, GraphSyncState, SyncedCounterpart } from "./
 export type SyncedFollowing = SyncedCounterpart;
 
 export interface FollowingsSyncResult {
-  sourceUserId: bigint;
+  sourceUserId: UserId;
   followingCount: number;
   sourceHandle: string;
-  followings: SyncedFollowing[];
-  syncRunId: bigint;
+  followings: readonly SyncedFollowing[];
+  syncRunId: IngestEventId;
   cursorExhausted: boolean;
 }
 
@@ -60,17 +61,17 @@ export class FollowingsSyncService extends BaseGraphSyncService<FollowingsPage> 
     });
   }
 
-  async syncFollowingsFull(params: { sourceUserId: bigint }): Promise<FollowingsSyncResult> {
+  async syncFollowingsFull(params: { sourceUserId: UserId }): Promise<FollowingsSyncResult> {
     const state = await this.syncGraph({ primaryUserId: params.sourceUserId, fullRefresh: true });
     return this.toResult(state);
   }
 
-  async syncFollowingsIncremental(params: { sourceUserId: bigint }): Promise<FollowingsSyncResult> {
+  async syncFollowingsIncremental(params: { sourceUserId: UserId }): Promise<FollowingsSyncResult> {
     const state = await this.syncGraph({ primaryUserId: params.sourceUserId, fullRefresh: false });
     return this.toResult(state);
   }
 
-  protected async fetchPrimaryProfile(primaryUserId: bigint): Promise<XUserData | null> {
+  protected async fetchPrimaryProfile(primaryUserId: UserId): Promise<XUserData | null> {
     try {
       return await this.client.fetchUserProfileById(primaryUserId);
     } catch (error) {
@@ -110,15 +111,15 @@ export class FollowingsSyncService extends BaseGraphSyncService<FollowingsPage> 
 
   protected validatePrimaryProfile(
     primaryProfile: XUserData | null,
-    primaryUserId: bigint,
+    primaryUserId: UserId,
   ): string {
     if (primaryProfile?.userId == null) {
-      throw new GraphSyncError(`Unable to load profile for user id '${primaryUserId}'`, {
+      throw new GraphSyncError(`Unable to load profile for user id '${primaryUserId.toString()}'`, {
         status: "user-info",
       });
     }
     if (!primaryProfile.userName) {
-      throw new GraphSyncError(`Profile for user id '${primaryUserId}' missing handle`, {
+      throw new GraphSyncError(`Profile for user id '${primaryUserId.toString()}' missing handle`, {
         status: "user-info",
       });
     }

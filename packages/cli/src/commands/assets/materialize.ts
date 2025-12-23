@@ -2,13 +2,18 @@ import { Command, Flags } from "@oclif/core";
 import { loadWorkerEnv } from "@bdx/config";
 import { migrateToLatestWithLock } from "@bdx/db";
 import { AssetEngine } from "@bdx/engine";
-import { createDbFromEnv, createLoggerFromEnv, createTwitterClient, destroyDbSafely } from "../../lib/context.js";
+import {
+  createDbFromEnv,
+  createLoggerFromEnv,
+  createTwitterClient,
+  destroyDbSafely,
+} from "../../lib/context.js";
 import {
   formatAssetParamsForLog,
   parseAssetParamsInput,
   resolveAssetSlug,
 } from "../../lib/assets.js";
-import { parsePositiveBigInt } from "../../lib/parsers.js";
+import { parseAssetInstanceId } from "../../lib/parsers.js";
 
 export default class AssetsMaterialize extends Command {
   static override description = "Materialize a single asset instance (by id or by params).";
@@ -51,9 +56,10 @@ export default class AssetsMaterialize extends Command {
       const triggerReason = flags["trigger-reason"] ?? "cli";
 
       const result = flags["instance-id"]
-        ? await engine.materializeInstanceById(parsePositiveBigInt(flags["instance-id"], "instance-id"), {
-            triggerReason,
-          })
+        ? await engine.materializeInstanceById(
+            parseAssetInstanceId(flags["instance-id"], "instance-id"),
+            { triggerReason },
+          )
         : await this.materializeFromParams(engine, flags, triggerReason);
 
       this.log(

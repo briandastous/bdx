@@ -1,9 +1,14 @@
 import type { DbOrTx } from "../../db.js";
 import type { AssetMaterializationStatus, AssetSlug, JsonValue } from "../../database.js";
+import type { AssetInstanceId, AssetMaterializationId } from "@bdx/ids";
+import {
+  AssetInstanceId as AssetInstanceIdBrand,
+  AssetMaterializationId as AssetMaterializationIdBrand,
+} from "@bdx/ids";
 
 export interface AssetMaterializationRecord {
-  id: bigint;
-  assetInstanceId: bigint;
+  id: AssetMaterializationId;
+  assetInstanceId: AssetInstanceId;
   assetSlug: AssetSlug;
   inputsHashVersion: number;
   inputsHash: string;
@@ -18,8 +23,8 @@ export interface AssetMaterializationRecord {
 }
 
 export interface AssetMaterializationWithRelations extends AssetMaterializationRecord {
-  dependencyMaterializationIds: bigint[];
-  requestedByMaterializationIds: bigint[];
+  dependencyMaterializationIds: AssetMaterializationId[];
+  requestedByMaterializationIds: AssetMaterializationId[];
 }
 
 function toMaterializationRecord(row: {
@@ -38,8 +43,8 @@ function toMaterializationRecord(row: {
   error_payload: JsonValue | null;
 }): AssetMaterializationRecord {
   return {
-    id: row.id,
-    assetInstanceId: row.asset_instance_id,
+    id: AssetMaterializationIdBrand(row.id),
+    assetInstanceId: AssetInstanceIdBrand(row.asset_instance_id),
     assetSlug: row.asset_slug,
     inputsHashVersion: row.inputs_hash_version,
     inputsHash: row.inputs_hash,
@@ -57,7 +62,7 @@ function toMaterializationRecord(row: {
 export async function createAssetMaterialization(
   db: DbOrTx,
   input: {
-    assetInstanceId: bigint;
+    assetInstanceId: AssetInstanceId;
     assetSlug: AssetSlug;
     inputsHashVersion: number;
     inputsHash: string;
@@ -100,7 +105,7 @@ export async function createAssetMaterialization(
 
 export async function updateAssetMaterialization(
   db: DbOrTx,
-  materializationId: bigint,
+  materializationId: AssetMaterializationId,
   update: {
     status: AssetMaterializationStatus;
     completedAt: Date | null;
@@ -124,7 +129,7 @@ export async function updateAssetMaterialization(
 
 export async function getAssetMaterializationById(
   db: DbOrTx,
-  materializationId: bigint,
+  materializationId: AssetMaterializationId,
 ): Promise<AssetMaterializationWithRelations | null> {
   const row = await db
     .selectFrom("asset_materializations")
@@ -162,14 +167,18 @@ export async function getAssetMaterializationById(
 
   return {
     ...toMaterializationRecord(row),
-    dependencyMaterializationIds: dependencies.map((dep) => dep.dependency_materialization_id),
-    requestedByMaterializationIds: requests.map((req) => req.requested_by_materialization_id),
+    dependencyMaterializationIds: dependencies.map((dep) =>
+      AssetMaterializationIdBrand(dep.dependency_materialization_id),
+    ),
+    requestedByMaterializationIds: requests.map((req) =>
+      AssetMaterializationIdBrand(req.requested_by_materialization_id),
+    ),
   };
 }
 
 export async function getLatestSuccessfulMaterialization(
   db: DbOrTx,
-  instanceId: bigint,
+  instanceId: AssetInstanceId,
 ): Promise<AssetMaterializationRecord | null> {
   const row = await db
     .selectFrom("asset_materializations")
@@ -200,7 +209,7 @@ export async function getLatestSuccessfulMaterialization(
 
 export async function listMaterializationsForInstance(
   db: DbOrTx,
-  params: { instanceId: bigint; limit: number },
+  params: { instanceId: AssetInstanceId; limit: number },
 ): Promise<AssetMaterializationRecord[]> {
   const rows = await db
     .selectFrom("asset_materializations")
@@ -229,8 +238,8 @@ export async function listMaterializationsForInstance(
 
 export async function insertMaterializationDependencies(
   db: DbOrTx,
-  materializationId: bigint,
-  dependencyMaterializationIds: bigint[],
+  materializationId: AssetMaterializationId,
+  dependencyMaterializationIds: AssetMaterializationId[],
 ): Promise<number> {
   if (dependencyMaterializationIds.length === 0) return 0;
 
@@ -252,8 +261,8 @@ export async function insertMaterializationDependencies(
 
 export async function insertMaterializationRequests(
   db: DbOrTx,
-  materializationId: bigint,
-  requestedByMaterializationIds: bigint[],
+  materializationId: AssetMaterializationId,
+  requestedByMaterializationIds: AssetMaterializationId[],
 ): Promise<number> {
   if (requestedByMaterializationIds.length === 0) return 0;
 

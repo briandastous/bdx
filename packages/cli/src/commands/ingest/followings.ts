@@ -1,8 +1,13 @@
 import { Command, Flags } from "@oclif/core";
 import { loadWorkerEnv } from "@bdx/config";
 import { FollowingsSyncService } from "@bdx/ingest";
-import { createDbFromEnv, createLoggerFromEnv, createTwitterClient, destroyDbSafely } from "../../lib/context.js";
-import { parsePositiveBigInt } from "../../lib/parsers.js";
+import {
+  createDbFromEnv,
+  createLoggerFromEnv,
+  createTwitterClient,
+  destroyDbSafely,
+} from "../../lib/context.js";
+import { parseUserId } from "../../lib/parsers.js";
 
 export default class IngestFollowings extends Command {
   static override description = "Run a followings ingest for a source X user id.";
@@ -21,7 +26,7 @@ export default class IngestFollowings extends Command {
 
   async run(): Promise<void> {
     const { flags } = await this.parse(IngestFollowings);
-    const userId = parsePositiveBigInt(flags["user-id"], "user-id");
+    const userId = parseUserId(flags["user-id"], "user-id");
 
     const env = loadWorkerEnv();
     const logger = createLoggerFromEnv(env);

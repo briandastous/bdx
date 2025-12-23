@@ -20,6 +20,7 @@
     "@bdx/db": "workspace:*",
     "@bdx/engine": "workspace:*",
     "@bdx/ingest": "workspace:*",
+    "@bdx/ids": "workspace:*",
     "@bdx/observability": "workspace:*",
     "@bdx/twitterapi-io": "workspace:*",
     "@oclif/core": "^4.0.33"

@@ -1,9 +1,11 @@
 import type { DbOrTx } from "../../db.js";
+import type { AssetInstanceId, UserId } from "@bdx/ids";
+import { UserId as UserIdBrand } from "@bdx/ids";
 
 export async function listSpecifiedUsersInputs(
   db: DbOrTx,
-  instanceId: bigint,
-): Promise<bigint[]> {
+  instanceId: AssetInstanceId,
+): Promise<UserId[]> {
   const rows = await db
     .selectFrom("segment_specified_users_inputs")
     .select(["user_external_id"])
@@ -11,12 +13,12 @@ export async function listSpecifiedUsersInputs(
     .orderBy("user_external_id", "asc")
     .execute();
 
-  return rows.map((row) => row.user_external_id);
+  return rows.map((row) => UserIdBrand(row.user_external_id));
 }
 
 export async function replaceSpecifiedUsersInputs(
   db: DbOrTx,
-  params: { instanceId: bigint; userExternalIds: Iterable<bigint> },
+  params: { instanceId: AssetInstanceId; userExternalIds: Iterable<UserId> },
 ): Promise<number> {
   const ids = Array.from(new Set(params.userExternalIds)).sort((a, b) => (a < b ? -1 : 1));
 

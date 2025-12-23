@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { PostId, UserId } from "@bdx/ids";
 import { TwitterApiClient } from "./client.js";
 import {
   TwitterApiRateLimitError,
@@ -93,7 +94,7 @@ describe("TwitterApiClient", () => {
     const client = createClient(() => new Response(JSON.stringify(payload), { status: 200 }));
 
     const page = await client.fetchFollowersPage("example");
-    expect(page.followers[0]?.userId).toBe(101n);
+    expect(page.followers[0]?.userId).toBe(UserId(101n));
     expect(page.followers[0]?.userName).toBe("alice");
     expect(page.nextCursor).toBe("next");
     expect(page.hasNextPage).toBe(true);
@@ -104,7 +105,7 @@ describe("TwitterApiClient", () => {
     const client = createClient(() => new Response(JSON.stringify(payload), { status: 200 }));
 
     const page = await client.fetchFollowingsPage("example");
-    expect(page.followings[0]?.userId).toBe(202n);
+    expect(page.followings[0]?.userId).toBe(UserId(202n));
     expect(page.followings[0]?.userName).toBe("bob");
     expect(page.nextCursor).toBeNull();
     expect(page.hasNextPage).toBe(false);
@@ -114,8 +115,8 @@ describe("TwitterApiClient", () => {
     const payload = loadFixture("./__fixtures__/user_batch.json");
     const client = createClient(() => new Response(JSON.stringify(payload), { status: 200 }));
 
-    const user = await client.fetchUserProfileById(101n);
-    expect(user?.userId).toBe(101n);
+    const user = await client.fetchUserProfileById(UserId(101n));
+    expect(user?.userId).toBe(UserId(101n));
     expect(user?.userName).toBe("alice");
   });
 
@@ -124,7 +125,7 @@ describe("TwitterApiClient", () => {
     const client = createClient(() => new Response(JSON.stringify(payload), { status: 200 }));
 
     const page = await client.fetchPostsPage("from:alice");
-    expect(page.posts[0]?.postId).toBe(500n);
-    expect(page.posts[0]?.authorUserId).toBe(101n);
+    expect(page.posts[0]?.postId).toBe(PostId(500n));
+    expect(page.posts[0]?.authorUserId).toBe(UserId(101n));
   });
 });

@@ -1,3 +1,18 @@
+import type {
+  AssetInstanceFanoutRootId,
+  AssetInstanceId,
+  AssetInstanceRootId,
+  AssetMaterializationId,
+  UserId,
+} from "@bdx/ids";
+import {
+  AssetInstanceFanoutRootId as AssetInstanceFanoutRootIdBrand,
+  AssetInstanceId as AssetInstanceIdBrand,
+  AssetInstanceRootId as AssetInstanceRootIdBrand,
+  AssetMaterializationId as AssetMaterializationIdBrand,
+  UserId as UserIdBrand,
+} from "@bdx/ids";
+
 export function parseBigInt(value: string, label: string): bigint {
   const trimmed = value.trim();
   if (trimmed.length === 0) {
@@ -26,6 +41,40 @@ export function parseBigIntCsv(value: string, label: string): bigint[] {
     throw new Error(`${label} must contain at least one id`);
   }
   return parts.map((part, index) => parsePositiveBigInt(part, `${label}[${index}]`));
+}
+
+export function parseUserId(value: string, label: string): UserId {
+  return UserIdBrand(parsePositiveBigInt(value, label));
+}
+
+export function parseUserIdCsv(value: string, label: string): UserId[] {
+  const parts = value
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  if (parts.length === 0) {
+    throw new Error(`${label} must contain at least one id`);
+  }
+  return parts.map((part, index) => parseUserId(part, `${label}[${index}]`));
+}
+
+export function parseAssetInstanceId(value: string, label: string): AssetInstanceId {
+  return AssetInstanceIdBrand(parsePositiveBigInt(value, label));
+}
+
+export function parseAssetInstanceRootId(value: string, label: string): AssetInstanceRootId {
+  return AssetInstanceRootIdBrand(parsePositiveBigInt(value, label));
+}
+
+export function parseAssetInstanceFanoutRootId(
+  value: string,
+  label: string,
+): AssetInstanceFanoutRootId {
+  return AssetInstanceFanoutRootIdBrand(parsePositiveBigInt(value, label));
+}
+
+export function parseAssetMaterializationId(value: string, label: string): AssetMaterializationId {
+  return AssetMaterializationIdBrand(parsePositiveBigInt(value, label));
 }
 
 export function parseDate(value: string, label: string): Date {
