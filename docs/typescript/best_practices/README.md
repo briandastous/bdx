@@ -4,15 +4,15 @@ These best practices are synthesized from the item pages in Dan Vanderkam’s Ef
 
 ## Index
 
-- 01. [Understand the Relationship Between TypeScript and JavaScript](01-understand-the-relationship-between-typescript-and-javascript.md)
-- 02. [Know Which TypeScript Options You're Using](02-know-which-typescript-options-you-re-using.md)
-- 03. [Understand That Code Generation Is Independent of Types](03-understand-that-code-generation-is-independent-of-types.md)
-- 04. [Get Comfortable with Structural Typing](04-get-comfortable-with-structural-typing.md)
-- 05. [Limit Use of the `any` Type](05-limit-use-of-the-any-type.md)
-- 06. [Use Your Editor to Interrogate and Explore the Type System](06-use-your-editor-to-interrogate-and-explore-the-type-system.md)
-- 07. [Think of Types as Sets of Values](07-think-of-types-as-sets-of-values.md)
-- 08. [Know How to Tell Whether a Symbol Is in the Type Space or Value Space](08-know-how-to-tell-whether-a-symbol-is-in-the-type-space-or-value-space.md)
-- 09. [Prefer Type Annotations to Type Assertions](09-prefer-type-annotations-to-type-assertions.md)
+- 1.  [Understand the Relationship Between TypeScript and JavaScript](01-understand-the-relationship-between-typescript-and-javascript.md)
+- 2.  [Know Which TypeScript Options You're Using](02-know-which-typescript-options-you-re-using.md)
+- 3.  [Understand That Code Generation Is Independent of Types](03-understand-that-code-generation-is-independent-of-types.md)
+- 4.  [Get Comfortable with Structural Typing](04-get-comfortable-with-structural-typing.md)
+- 5.  [Limit Use of the `any` Type](05-limit-use-of-the-any-type.md)
+- 6.  [Use Your Editor to Interrogate and Explore the Type System](06-use-your-editor-to-interrogate-and-explore-the-type-system.md)
+- 7.  [Think of Types as Sets of Values](07-think-of-types-as-sets-of-values.md)
+- 8.  [Know How to Tell Whether a Symbol Is in the Type Space or Value Space](08-know-how-to-tell-whether-a-symbol-is-in-the-type-space-or-value-space.md)
+- 9.  [Prefer Type Annotations to Type Assertions](09-prefer-type-annotations-to-type-assertions.md)
 - 10. [Avoid Object Wrapper Types (String, Number, Boolean, Symbol, BigInt)](10-avoid-object-wrapper-types.md)
 - 11. [Distinguish Excess Property Checking from Type Checking](11-distinguish-excess-property-checking-from-type-checking.md)
 - 12. [Apply Types to Entire Function Expressions When Possible](12-apply-types-to-entire-function-expressions-when-possible.md)
@@ -88,3 +88,6 @@ These best practices are synthesized from the item pages in Dan Vanderkam’s Ef
 - 82. [Convert Module by Module Up Your Dependency Graph](82-convert-module-by-module-up-your-dependency-graph.md)
 - 83. [Don't Consider Migration Complete Until You Enable `noImplicitAny`](83-don-t-consider-migration-complete-until-you-enable-noimplicitany.md)
 
+## Repo-specific additions (prefixed `Rxx-`)
+
+- None yet.
