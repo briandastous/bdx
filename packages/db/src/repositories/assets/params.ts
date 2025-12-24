@@ -194,7 +194,8 @@ async function fetchSubjectSegmentParams(
         .where("asset_params_id", "=", base.id)
         .executeTakeFirst();
       break;
-    default:
+    case "segment_specified_users":
+    case "post_corpus_for_segment":
       throw new Error(`Unexpected asset slug for subject params: ${base.assetSlug}`);
   }
 

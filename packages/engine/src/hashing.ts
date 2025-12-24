@@ -34,15 +34,22 @@ function stableSerialize(value: unknown, atPath: string): string {
     case "string":
       return JSON.stringify(value);
     case "number": {
-      if (!Number.isFinite(value)) throw new Error(`Non-finite number not allowed in hash input at ${atPath}`);
+      if (!Number.isFinite(value))
+        throw new Error(`Non-finite number not allowed in hash input at ${atPath}`);
       return JSON.stringify(value);
     }
     case "boolean":
       return value ? "true" : "false";
+    case "function":
+      throw new Error(`function not allowed in hash input at ${atPath}`);
+    case "symbol":
+      throw new Error(`symbol not allowed in hash input at ${atPath}`);
     case "undefined":
       throw new Error(`undefined not allowed in hash input at ${atPath}`);
     case "bigint":
-      throw new Error(`bigint not allowed in hash input at ${atPath}; convert to a decimal string first`);
+      throw new Error(
+        `bigint not allowed in hash input at ${atPath}; convert to a decimal string first`,
+      );
     case "object": {
       if (Array.isArray(value)) {
         const serialized = value.map((item, index) => {

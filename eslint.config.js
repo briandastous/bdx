@@ -49,6 +49,7 @@ export default tseslint.config(
           allowNumber: true,
         },
       ],
+      "@typescript-eslint/switch-exhaustiveness-check": "error",
       eqeqeq: ["error", "always", { null: "ignore" }],
       "no-eq-null": "off",
     },
