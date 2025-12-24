@@ -33,7 +33,12 @@ export const PARAMS_HASH_VERSION = HASH_VERSION_V1;
 
 const userIdSchema = z.union([z.string(), z.number().int(), z.bigint()]).transform((value) => {
   if (typeof value === "bigint") return UserId(value);
-  if (typeof value === "number") return UserId(BigInt(value));
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value)) {
+      throw new Error("Expected a safe integer for UserId input");
+    }
+    return UserId(BigInt(value));
+  }
   return parseUserId(value);
 });
 

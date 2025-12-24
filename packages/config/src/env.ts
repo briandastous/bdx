@@ -10,7 +10,12 @@ const deployEnvSchema = z.enum(["development", "staging", "production"]);
 const logLevelSchema = z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]);
 const bigintSchema = z.union([z.string(), z.number().int(), z.bigint()]).transform((value) => {
   if (typeof value === "bigint") return value;
-  if (typeof value === "number") return BigInt(value);
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value)) {
+      throw new Error("Expected a safe integer for bigint input");
+    }
+    return BigInt(value);
+  }
   const trimmed = value.trim();
   if (trimmed.length === 0) {
     throw new Error("Expected a bigint string");

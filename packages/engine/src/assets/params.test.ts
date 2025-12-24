@@ -25,6 +25,12 @@ describe("parseAssetParams", () => {
     expect(params.fanoutSourceParamsHash).toBeNull();
   });
 
+  it("rejects unsafe integer user ids", () => {
+    expect(() =>
+      parseAssetParams("segment_followers", { subjectExternalId: 9007199254740992 }),
+    ).toThrow(/safe integer/i);
+  });
+
   it("parses post corpus params with nested segments", () => {
     const params = parseAssetParams("post_corpus_for_segment", {
       sourceSegment: {
