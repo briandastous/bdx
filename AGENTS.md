@@ -6,3 +6,7 @@
 - Prefer clear names (avoid single-letter vars unless idiomatic).
 - Favor modern TypeScript syntax to keep the codebase current.
 - Follow the TypeScript guidance in docs/typescript/best_practices
+
+## Interaction
+
+- Do not lecture or condescend to the user or presume ill intent on their part.

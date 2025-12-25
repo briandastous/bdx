@@ -123,7 +123,7 @@ The parity source of truth is the legacy codebase (`bdastous_monorepo`).
   - `NOT NULL`, `DEFAULT`, `PRIMARY KEY`, `FOREIGN KEY` (with `ON DELETE CASCADE` when appropriate),
   - `UNIQUE` constraints and/or unique indexes (including partial unique indexes),
   - `CHECK` constraints for state invariants (e.g., `(status = 'in_progress') = (completed_at IS NULL)`).
-- If a legacy invariant cannot be expressed declaratively, prefer reshaping the schema so it *can* be expressed (e.g., split polymorphic tables into typed tables).
+- If a legacy invariant cannot be expressed declaratively, prefer reshaping the schema so it _can_ be expressed (e.g., split polymorphic tables into typed tables).
 - If it still cannot be expressed declaratively and it is **context-free integrity** (must hold regardless of caller/service), prefer **triggers** over repository-only enforcement.
 - If an invariant requires **caller context** (e.g., needs a run/materialization ID, depends on workflow semantics), enforce it in the repository/query layer (Kysely) and back it with tests.
 - Any invariant not enforced declaratively must be explicitly documented (see “Invariant Register”) with its chosen enforcement mechanism and a test strategy.
