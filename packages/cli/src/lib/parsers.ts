@@ -3,6 +3,7 @@ import type {
   AssetInstanceId,
   AssetInstanceRootId,
   AssetMaterializationId,
+  PostId,
   UserId,
 } from "@bdx/ids";
 import {
@@ -10,6 +11,7 @@ import {
   AssetInstanceId as AssetInstanceIdBrand,
   AssetInstanceRootId as AssetInstanceRootIdBrand,
   AssetMaterializationId as AssetMaterializationIdBrand,
+  PostId as PostIdBrand,
   UserId as UserIdBrand,
 } from "@bdx/ids";
 
@@ -56,6 +58,21 @@ export function parseUserIdCsv(value: string, label: string): UserId[] {
     throw new Error(`${label} must contain at least one id`);
   }
   return parts.map((part, index) => parseUserId(part, `${label}[${index}]`));
+}
+
+export function parsePostId(value: string, label: string): PostId {
+  return PostIdBrand(parsePositiveBigInt(value, label));
+}
+
+export function parsePostIdCsv(value: string, label: string): PostId[] {
+  const parts = value
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  if (parts.length === 0) {
+    throw new Error(`${label} must contain at least one id`);
+  }
+  return parts.map((part, index) => parsePostId(part, `${label}[${index}]`));
 }
 
 export function parseAssetInstanceId(value: string, label: string): AssetInstanceId {

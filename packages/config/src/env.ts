@@ -45,6 +45,8 @@ const twitterApiConfigInputSchema = z
     baseUrl: z.string().min(1).optional(),
     rateLimitQps: z.number().positive().optional(),
     maxQueryLength: z.number().int().positive().optional(),
+    batchUsersByIdsMax: z.number().int().positive().optional(),
+    batchPostsByIdsMax: z.number().int().positive().optional(),
   })
   .strict()
   .optional();
@@ -79,6 +81,8 @@ const twitterApiConfigSchema = z
     baseUrl: z.string().min(1).default("https://api.twitterapi.io"),
     rateLimitQps: z.number().positive().default(1),
     maxQueryLength: z.number().int().positive().default(512),
+    batchUsersByIdsMax: z.number().int().positive().default(100),
+    batchPostsByIdsMax: z.number().int().positive().default(100),
   })
   .strict()
   .default({});
@@ -183,6 +187,8 @@ export interface TwitterApiConfig {
   baseUrl: string;
   rateLimitQps: number;
   maxQueryLength: number;
+  batchUsersByIdsMax: number;
+  batchPostsByIdsMax: number;
 }
 
 export interface RetentionConfig {
@@ -319,6 +325,8 @@ const twitterApiOverridesEnvSchema = z
     TWITTERAPI_IO_BASE_URL: z.string().min(1).optional(),
     TWITTERAPI_IO_RATE_LIMIT_QPS: z.coerce.number().positive().optional(),
     TWITTERAPI_IO_MAX_QUERY_LENGTH: z.coerce.number().int().positive().optional(),
+    TWITTERAPI_IO_BATCH_USERS_BY_IDS_MAX: z.coerce.number().int().positive().optional(),
+    TWITTERAPI_IO_BATCH_POSTS_BY_IDS_MAX: z.coerce.number().int().positive().optional(),
   })
   .strip();
 
@@ -368,6 +376,10 @@ function resolveTwitterApiConfig(
     baseUrl: overrides.TWITTERAPI_IO_BASE_URL ?? yaml.twitterapiIo.baseUrl,
     rateLimitQps: overrides.TWITTERAPI_IO_RATE_LIMIT_QPS ?? yaml.twitterapiIo.rateLimitQps,
     maxQueryLength: overrides.TWITTERAPI_IO_MAX_QUERY_LENGTH ?? yaml.twitterapiIo.maxQueryLength,
+    batchUsersByIdsMax:
+      overrides.TWITTERAPI_IO_BATCH_USERS_BY_IDS_MAX ?? yaml.twitterapiIo.batchUsersByIdsMax,
+    batchPostsByIdsMax:
+      overrides.TWITTERAPI_IO_BATCH_POSTS_BY_IDS_MAX ?? yaml.twitterapiIo.batchPostsByIdsMax,
   };
 }
 

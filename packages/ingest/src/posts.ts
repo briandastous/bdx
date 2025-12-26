@@ -11,7 +11,7 @@ import type { IngestEventId, PostId, UserId } from "@bdx/ids";
 import {
   addPostsSyncRunTargetUsers,
   createPostsSyncRun,
-  ensureUsers,
+  listUserHandlesByIds,
   updatePostsSyncRun,
   upsertPosts,
   upsertPostsMeta,
@@ -21,7 +21,12 @@ import {
 } from "@bdx/db";
 import type { Logger } from "@bdx/observability";
 import { TwitterApiError, TwitterApiRateLimitError } from "@bdx/twitterapi-io";
-import type { TweetData, TwitterApiClient, XUserData } from "@bdx/twitterapi-io";
+import type { TweetData, TwitterApiClient } from "@bdx/twitterapi-io";
+import {
+  UsersHydrationError,
+  UsersHydrationRateLimitError,
+  UsersHydrationService,
+} from "./hydration.js";
 import { userProfileInputFromXUser } from "./graph_sync.js";
 import { resolveHttpBodyMaxBytes, sanitizeHttpExchange } from "./http_snapshot.js";
 
@@ -68,12 +73,14 @@ export class PostsSyncService {
   private readonly client: TwitterApiClient;
   private readonly maxQueryLength: number;
   private readonly httpSnapshotMaxBytes: number;
+  private readonly usersHydration: UsersHydrationService;
 
   constructor(params: {
     db: Db;
     logger: Logger;
     client: TwitterApiClient;
     maxQueryLength: number;
+    batchUsersByIdsMax: number;
     httpSnapshotMaxBytes?: number;
   }) {
     if (!Number.isFinite(params.maxQueryLength) || params.maxQueryLength <= 0) {
@@ -84,6 +91,17 @@ export class PostsSyncService {
     this.client = params.client;
     this.maxQueryLength = params.maxQueryLength;
     this.httpSnapshotMaxBytes = resolveHttpBodyMaxBytes(params.httpSnapshotMaxBytes);
+    const httpSnapshotParam =
+      params.httpSnapshotMaxBytes !== undefined
+        ? { httpSnapshotMaxBytes: params.httpSnapshotMaxBytes }
+        : {};
+    this.usersHydration = new UsersHydrationService({
+      db: params.db,
+      logger: params.logger,
+      client: params.client,
+      batchSize: params.batchUsersByIdsMax,
+      ...httpSnapshotParam,
+    });
   }
 
   async syncPostsFull(params: { userIds: Iterable<UserId> }): Promise<PostsSyncResult> {
@@ -109,10 +127,8 @@ export class PostsSyncService {
       throw new Error("userIds must contain at least one id");
     }
 
-    await ensureUsers(this.db, uniqueUserIds);
     const run = await createPostsSyncRun(this.db, { ingestKind: POSTS_INGEST_KIND });
     const syncRunId = run.id;
-    await addPostsSyncRunTargetUsers(this.db, syncRunId, uniqueUserIds);
 
     this.logger.info(
       {
@@ -124,42 +140,20 @@ export class PostsSyncService {
       "Starting posts sync",
     );
 
-    let profiles: Map<UserId, XUserData>;
     try {
-      profiles = await this.loadProfiles(uniqueUserIds);
+      await this.ensureTargetsHydrated(uniqueUserIds);
+      await addPostsSyncRunTargetUsers(this.db, syncRunId, uniqueUserIds);
     } catch (error) {
       await this.recordFailure(syncRunId, error, params.since);
       throw this.unwrapError(error);
     }
 
-    const targetHandles = new Map<UserId, string>();
-    const userUpdates: UserProfileInput[] = [];
-
-    for (const profile of profiles.values()) {
-      if (!profile.userName) {
-        const error = new PostsSyncError(
-          `Profile for user id '${profile.userId ?? "unknown"}' missing handle`,
-          { status: "user-info" },
-        );
-        await this.recordFailure(syncRunId, error, params.since);
-        throw this.unwrapError(error);
-      }
-      if (profile.userId === null) {
-        const error = new PostsSyncError("Profile missing user id", { status: "user-info" });
-        await this.recordFailure(syncRunId, error, params.since);
-        throw this.unwrapError(error);
-      }
-
-      const { profile: userProfile } = userProfileInputFromXUser({
-        user: profile,
-        ingestEventId: syncRunId,
-        ingestKind: POSTS_INGEST_KIND,
-        updatedAt: new Date(),
-      });
-      if (userProfile) {
-        userUpdates.push(userProfile);
-      }
-      targetHandles.set(profile.userId, profile.userName);
+    let targetHandles: Map<UserId, string>;
+    try {
+      targetHandles = await this.loadTargetHandles(uniqueUserIds);
+    } catch (error) {
+      await this.recordFailure(syncRunId, error, params.since);
+      throw this.unwrapError(error);
     }
 
     let baseQueries: string[] = [];
@@ -170,39 +164,12 @@ export class PostsSyncService {
       throw this.unwrapError(error);
     }
 
-    if (baseQueries.length === 0) {
-      const completionTime = new Date();
-      if (userUpdates.length > 0) {
-        await withTransaction(this.db, async (trx) => {
-          for (const user of userUpdates) {
-            await upsertUserProfile(trx, user);
-          }
-        });
-      }
-
-      const update: PostsSyncRunUpdateInput = {
-        status: "success",
-        completedAt: completionTime,
-        cursorExhausted: true,
-        lastApiStatus: "204",
-        lastApiError: null,
-        syncedSince: params.since,
-      };
-      await updatePostsSyncRun(this.db, syncRunId, update);
-
-      return {
-        syncRunId,
-        targetUserIds: uniqueUserIds,
-        postCount: 0,
-        postIds: [],
-        cursorExhausted: true,
-        syncedSince: params.since,
-      };
-    }
-
     const postsRows: PostInput[] = [];
     const postsMetaRows: PostsMetaInput[] = [];
     const usersMetaRows = new Map<UserId, UsersMetaInput>();
+    const userProfilesById = new Map<UserId, UserProfileInput>();
+    const unexpectedAuthors = new Set<UserId>();
+    const targetUserIds = new Set(uniqueUserIds);
     const seenPostIds = new Set<PostId>();
     let cursorExhausted = true;
 
@@ -235,7 +202,7 @@ export class PostsSyncService {
               throw error;
             }
 
-            const { postRows, metaRows, usersMeta, postIds } = this.processPage(
+            const { postRows, metaRows, usersMeta, postIds, userProfiles } = this.processPage(
               page.posts,
               syncRunId,
             );
@@ -244,8 +211,16 @@ export class PostsSyncService {
             for (const [userId, meta] of usersMeta.entries()) {
               usersMetaRows.set(userId, meta);
             }
+            for (const profile of userProfiles) {
+              userProfilesById.set(profile.id, profile);
+            }
             for (const postId of postIds) {
               seenPostIds.add(postId);
+            }
+            for (const row of postRows) {
+              if (!targetUserIds.has(row.authorId)) {
+                unexpectedAuthors.add(row.authorId);
+              }
             }
 
             windowCount += page.posts.length;
@@ -280,6 +255,20 @@ export class PostsSyncService {
       throw this.unwrapError(error);
     }
 
+    if (unexpectedAuthors.size > 0) {
+      this.logger.warn(
+        {
+          ingestKind: POSTS_INGEST_KIND,
+          syncRunId: syncRunId.toString(),
+          run_id: syncRunId.toString(),
+          unexpectedAuthorIds: Array.from(unexpectedAuthors)
+            .map((id) => id.toString())
+            .sort(),
+        },
+        "Posts sync returned tweets authored by unexpected users",
+      );
+    }
+
     const now = new Date();
     for (const userId of uniqueUserIds) {
       if (!usersMetaRows.has(userId)) {
@@ -293,8 +282,8 @@ export class PostsSyncService {
     }
 
     await withTransaction(this.db, async (trx) => {
-      for (const user of userUpdates) {
-        await upsertUserProfile(trx, user);
+      for (const profile of userProfilesById.values()) {
+        await upsertUserProfile(trx, profile);
       }
       if (postsRows.length > 0) {
         await upsertPosts(trx, postsRows);
@@ -340,31 +329,36 @@ export class PostsSyncService {
     return result;
   }
 
-  private async loadProfiles(userIds: UserId[]): Promise<Map<UserId, XUserData>> {
-    const profiles = new Map<UserId, XUserData>();
-    for (const userId of userIds) {
-      try {
-        const profile = await this.client.fetchUserProfileById(userId);
-        if (profile?.userId == null) {
-          throw new PostsSyncError(`Unable to load profile for user id '${userId.toString()}'`, {
-            status: "user-info",
-          });
-        }
-        profiles.set(userId, profile);
-      } catch (error) {
-        if (error instanceof TwitterApiRateLimitError) {
-          throw new PostsSyncRateLimitError(error.message, {
-            retryAfterSeconds: error.retryAfterSeconds,
-            original: error,
-          });
-        }
-        if (error instanceof TwitterApiError) {
-          throw new PostsSyncError(error.message, { status: "user-info", original: error });
-        }
-        throw error;
+  private async ensureTargetsHydrated(userIds: UserId[]): Promise<void> {
+    try {
+      await this.usersHydration.hydrateUsersByIds({ userIds });
+    } catch (error) {
+      if (error instanceof UsersHydrationRateLimitError) {
+        throw new PostsSyncRateLimitError(error.message, {
+          retryAfterSeconds: error.retryAfterSeconds,
+          original: error,
+        });
       }
+      if (error instanceof UsersHydrationError) {
+        throw new PostsSyncError(error.message, { status: "user-hydration", original: error });
+      }
+      throw error;
     }
-    return profiles;
+  }
+
+  private async loadTargetHandles(userIds: UserId[]): Promise<Map<UserId, string>> {
+    const handles = await listUserHandlesByIds(this.db, userIds);
+    const targetHandles = new Map<UserId, string>();
+    for (const userId of userIds) {
+      const handle = handles.get(userId);
+      if (handle == null || handle.trim().length === 0) {
+        throw new PostsSyncError(`Missing handle for user id '${userId.toString()}'`, {
+          status: "user-info",
+        });
+      }
+      targetHandles.set(userId, handle);
+    }
+    return targetHandles;
   }
 
   private buildQueries(userIds: UserId[], handles: Map<UserId, string>): string[] {
@@ -418,12 +412,14 @@ export class PostsSyncService {
     postRows: PostInput[];
     metaRows: PostsMetaInput[];
     usersMeta: Map<UserId, UsersMetaInput>;
+    userProfiles: UserProfileInput[];
     postIds: Set<PostId>;
   } {
     const now = new Date();
     const postRows: PostInput[] = [];
     const metaRows: PostsMetaInput[] = [];
     const usersMeta = new Map<UserId, UsersMetaInput>();
+    const userProfiles: UserProfileInput[] = [];
     const postIds = new Set<PostId>();
 
     for (const post of posts) {
@@ -447,9 +443,20 @@ export class PostsSyncService {
         ingestKind: POSTS_INGEST_KIND,
         updatedAt: now,
       });
+      if (post.authorProfile != null) {
+        const { profile } = userProfileInputFromXUser({
+          user: post.authorProfile,
+          ingestEventId: syncRunId,
+          ingestKind: POSTS_INGEST_KIND,
+          updatedAt: now,
+        });
+        if (profile != null) {
+          userProfiles.push(profile);
+        }
+      }
     }
 
-    return { postRows, metaRows, usersMeta, postIds };
+    return { postRows, metaRows, usersMeta, userProfiles, postIds };
   }
 
   private async recordFailure(

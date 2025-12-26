@@ -2,6 +2,7 @@ import type {
   FollowersItem,
   FollowingsItem,
   TweetItem,
+  TweetsByIdsItem,
   UserBatchItem,
   UserInfoData,
 } from "./api_types.js";
@@ -12,7 +13,7 @@ import {
   TwitterApiTransportError,
   TwitterApiUnexpectedResponseError,
 } from "./errors.js";
-import type { UserId } from "@bdx/ids";
+import type { PostId, UserId } from "@bdx/ids";
 import { chooseCursor, chooseHasNext } from "./pagination.js";
 import { configureRateLimit, enforceRateLimit } from "./rate_limit.js";
 import type {
@@ -24,6 +25,7 @@ import type {
   PostsPage,
   RequestSnapshot,
   ResponseSnapshot,
+  TweetData,
   XUserData,
 } from "./types.js";
 
@@ -68,17 +70,25 @@ export class TwitterApiClient {
   }
 
   async fetchUserProfileById(userId: UserId): Promise<XUserData | null> {
+    const users = await this.fetchUsersByIds([userId]);
+    return users.get(userId) ?? null;
+  }
+
+  async fetchUsersByIds(userIds: readonly UserId[]): Promise<Map<UserId, XUserData>> {
+    if (userIds.length === 0) return new Map<UserId, XUserData>();
+    const unique = Array.from(new Set(userIds));
     const { json } = await this.requestJson("/twitter/user/batch_info_by_ids", {
-      userIds: userId.toString(),
+      userIds: unique.map((id) => id.toString()).join(","),
     });
     const payload = ensureJsonObject(json, "user batch response");
-    const users = asJsonArray(payload["users"]).filter(isUserBatchItem);
-    if (users.length === 0) return null;
-
-    const match = users.find((user) => user.id === userId.toString());
-    const fallback = users[0];
-    if (!fallback) return null;
-    return convertUser(match ?? fallback);
+    const users = asJsonArray(payload["users"]).filter(isUserBatchItem).map(convertUser);
+    const byId = new Map<UserId, XUserData>();
+    for (const user of users) {
+      if (user.userId !== null) {
+        byId.set(user.userId, user);
+      }
+    }
+    return byId;
   }
 
   async fetchFollowersPage(handle: string, cursor?: string | null): Promise<FollowersPage> {
@@ -148,6 +158,19 @@ export class TwitterApiClient {
       request,
       response,
     };
+  }
+
+  async fetchTweetsByIds(tweetIds: readonly PostId[]): Promise<TweetData[]> {
+    if (tweetIds.length === 0) return [];
+    const unique = Array.from(new Set(tweetIds));
+    const { json } = await this.requestJson("/twitter/tweets", {
+      tweet_ids: unique.map((id) => id.toString()).join(","),
+    });
+    const payload = ensureJsonObject(json, "tweets by ids response");
+    const tweets = asJsonArray(payload["tweets"]).filter(isTweetsByIdsItem);
+    return tweets
+      .map(convertTweet)
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
   }
 
   private async requestJson(
@@ -306,6 +329,10 @@ function isFollowingsItem(value: unknown): value is FollowingsItem {
 }
 
 function isTweetItem(value: unknown): value is TweetItem {
+  return isJsonObject(value);
+}
+
+function isTweetsByIdsItem(value: unknown): value is TweetsByIdsItem {
   return isJsonObject(value);
 }
 

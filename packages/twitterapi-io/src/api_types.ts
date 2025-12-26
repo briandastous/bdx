@@ -19,3 +19,8 @@ export type FollowingsItem = NonNullable<FollowingsResponse["followings"]>[numbe
 export type PostsResponse =
   paths["/twitter/tweet/advanced_search"]["get"]["responses"]["200"]["content"]["application/json"];
 export type TweetItem = NonNullable<PostsResponse["tweets"]>[number];
+
+export type TweetsByIdsResponse =
+  paths["/twitter/tweets"]["get"]["responses"]["200"]["content"]["application/json"];
+export type TweetsByIdsItem = NonNullable<TweetsByIdsResponse["tweets"]>[number];
+export type TweetAuthor = NonNullable<TweetsByIdsItem["author"]>;

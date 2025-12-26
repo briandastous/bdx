@@ -86,6 +86,7 @@ export interface AssetEngineParams {
   logger: Logger;
   twitterClient: TwitterApiClient;
   postsMaxQueryLength: number;
+  usersByIdsBatchSize: number;
   lockTimeoutMs?: number;
   httpSnapshotMaxBytes?: number;
 }
@@ -123,6 +124,7 @@ export class AssetEngine {
       logger: params.logger,
       client: params.twitterClient,
       maxQueryLength: params.postsMaxQueryLength,
+      batchUsersByIdsMax: params.usersByIdsBatchSize,
       ...httpSnapshotParam,
     });
   }

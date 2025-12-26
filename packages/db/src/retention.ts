@@ -7,6 +7,8 @@ const NON_WEBHOOK_INGEST_KINDS: IngestKind[] = [
   "twitterio_api_user_followers",
   "twitterio_api_user_followings",
   "twitterio_api_users_posts",
+  "twitterio_api_users_by_ids",
+  "twitterio_api_posts_by_ids",
 ];
 
 const WEBHOOK_INGEST_KIND: IngestKind = "ifttt_webhook_new_follow";

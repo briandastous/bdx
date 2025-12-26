@@ -1,8 +1,14 @@
 import { Command, Flags } from "@oclif/core";
-import { loadBaseEnv } from "@bdx/config";
+import { loadBaseEnv, loadWorkerEnv } from "@bdx/config";
 import { enableAssetInstanceRoot, replaceSpecifiedUsersInputs } from "@bdx/db";
 import type { AssetInstanceId } from "@bdx/ids";
-import { createDbFromEnv, createLoggerFromEnv, destroyDbSafely } from "../../../lib/context.js";
+import { UsersHydrationService } from "@bdx/ingest";
+import {
+  createDbFromEnv,
+  createLoggerFromEnv,
+  createTwitterClient,
+  destroyDbSafely,
+} from "../../../lib/context.js";
 import {
   ensureAssetInstance,
   formatAssetParamsForLog,
@@ -56,7 +62,16 @@ export default class AssetsRootsEnable extends Command {
             this.error("specified-user-ids is only valid for segment_specified_users", { exit: 2 });
           }
           const ids = parseUserIdCsv(flags["specified-user-ids"], "specified-user-ids");
-          await replaceSpecifiedUsersInputs(db, { instanceId, userExternalIds: ids });
+          const workerEnv = loadWorkerEnv();
+          const twitterClient = createTwitterClient(workerEnv);
+          const hydration = new UsersHydrationService({
+            db,
+            logger,
+            client: twitterClient,
+            batchSize: workerEnv.twitterapiIo.batchUsersByIdsMax,
+          });
+          await hydration.hydrateUsersByIds({ userIds: ids });
+          await replaceSpecifiedUsersInputs(db, { instanceId, userIds: ids });
         }
       }
 

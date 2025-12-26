@@ -1,18 +1,30 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type StartedPostgreSqlContainer, PostgreSqlContainer } from "@testcontainers/postgresql";
 import { createDb, destroyDb, migrateToLatest, type Db } from "@bdx/db";
-import { createPinoOptions } from "@bdx/observability";
+import { createLogger } from "@bdx/observability";
 import { TwitterApiClient, type XUserData } from "@bdx/twitterapi-io";
 import { UserId } from "@bdx/ids";
 import { buildServer } from "./server.js";
 
 class StubTwitterApiClient extends TwitterApiClient {
-  constructor(private readonly profile: XUserData | null) {
+  constructor(private readonly profiles: XUserData[]) {
     super({ token: "test-token", baseUrl: "http://localhost" });
   }
 
-  override fetchUserProfileByHandle(_handle: string): Promise<XUserData | null> {
-    return Promise.resolve(this.profile);
+  override fetchUserProfileByHandle(handle: string): Promise<XUserData | null> {
+    const profile = this.profiles.find((entry) => entry.userName === handle) ?? null;
+    return Promise.resolve(profile);
+  }
+
+  override fetchUsersByIds(userIds: readonly UserId[]): Promise<Map<UserId, XUserData>> {
+    const results = new Map<UserId, XUserData>();
+    for (const profile of this.profiles) {
+      if (profile.userId === null) continue;
+      if (userIds.includes(profile.userId)) {
+        results.set(profile.userId, profile);
+      }
+    }
+    return Promise.resolve(results);
   }
 }
 
@@ -60,15 +72,46 @@ describe("webhook ingestion", () => {
     await container.stop();
   });
 
-  function buildTestServer(profile: XUserData | null) {
+  function buildTestServer(profiles: XUserData[]) {
     return buildServer({
       db,
-      loggerOptions: createPinoOptions({ env: "test", level: "silent", service: "api" }),
+      logger: createLogger({ env: "test", level: "silent", service: "api" }),
       webhookToken: "secret",
-      twitterClient: new StubTwitterApiClient(profile),
+      twitterClient: new StubTwitterApiClient(profiles),
       xSelf: { userId: UserId(555n), handle: "target" },
+      usersByIdsBatchSize: 100,
     });
   }
+
+  const targetProfile: XUserData = {
+    userId: UserId(555n),
+    userName: "target",
+    displayName: "Target",
+    profileUrl: null,
+    profileImageUrl: null,
+    coverImageUrl: null,
+    bio: null,
+    location: null,
+    isBlueVerified: null,
+    verifiedType: null,
+    isTranslator: null,
+    isAutomated: null,
+    automatedBy: null,
+    possiblySensitive: null,
+    unavailable: null,
+    unavailableMessage: null,
+    unavailableReason: null,
+    followersCount: null,
+    followingCount: null,
+    favouritesCount: null,
+    mediaCount: null,
+    statusesCount: null,
+    createdAt: null,
+    bioEntities: null,
+    affiliatesHighlightedLabel: null,
+    pinnedTweetIds: null,
+    withheldCountries: null,
+  };
 
   const followerProfile: XUserData = {
     userId: UserId(777n),
@@ -101,7 +144,7 @@ describe("webhook ingestion", () => {
   };
 
   it("rejects missing webhook tokens", async () => {
-    const server = buildTestServer(followerProfile);
+    const server = buildTestServer([targetProfile, followerProfile]);
     await server.ready();
 
     const response = await server.inject({
@@ -117,7 +160,7 @@ describe("webhook ingestion", () => {
   });
 
   it("rejects invalid webhook payloads", async () => {
-    const server = buildTestServer(followerProfile);
+    const server = buildTestServer([targetProfile, followerProfile]);
     await server.ready();
 
     const response = await server.inject({
@@ -133,7 +176,7 @@ describe("webhook ingestion", () => {
   });
 
   it("accepts a webhook and persists the follower relationship", async () => {
-    const server = buildTestServer(followerProfile);
+    const server = buildTestServer([targetProfile, followerProfile]);
     await server.ready();
 
     const response = await server.inject({
@@ -161,11 +204,14 @@ describe("webhook ingestion", () => {
       { target_id: UserId(555n), follower_id: UserId(777n), is_deleted: false },
     ]);
 
+    const users = await db.selectFrom("users").select(["id"]).orderBy("id", "asc").execute();
+    expect(users.map((row) => row.id)).toEqual([UserId(555n), UserId(777n)]);
+
     await server.close();
   });
 
   it("serves OpenAPI JSON", async () => {
-    const server = buildTestServer(followerProfile);
+    const server = buildTestServer([targetProfile, followerProfile]);
     await server.ready();
 
     const response = await server.inject({ method: "GET", url: "/openapi.json" });

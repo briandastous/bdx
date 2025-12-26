@@ -25,7 +25,9 @@ function buildUserProfile(input: {
   id: UserId;
   handle: string;
   ingestEventId: IngestEventId;
+  ingestKind?: IngestKind;
 }): UserProfileInput {
+  const ingestKind = input.ingestKind ?? "twitterio_api_user_followers";
   return {
     id: input.id,
     handle: input.handle,
@@ -55,9 +57,25 @@ function buildUserProfile(input: {
     pinnedTweetIds: null,
     withheldCountries: null,
     ingestEventId: input.ingestEventId,
-    ingestKind: "twitterio_api_user_followers",
+    ingestKind,
     updatedAt: new Date("2024-01-01T00:00:00Z"),
   };
+}
+
+async function seedUsers(db: Db, userIds: UserId[]): Promise<void> {
+  if (userIds.length === 0) return;
+  const ingestEventId = await createIngestEvent(db, "twitterio_api_users_by_ids");
+  for (const userId of userIds) {
+    await upsertUserProfile(
+      db,
+      buildUserProfile({
+        id: userId,
+        handle: `user${userId.toString()}`,
+        ingestEventId,
+        ingestKind: "twitterio_api_users_by_ids",
+      }),
+    );
+  }
 }
 
 async function resetDb(db: Db): Promise<void> {
@@ -98,9 +116,33 @@ describe("core repositories", () => {
     await container.stop();
   });
 
+  it("fails to upsert follows when users are missing", async () => {
+    const targetId = UserId(1n);
+    const followerId = UserId(2n);
+    await expect(upsertFollows(db, [{ targetId, followerId }])).rejects.toThrow();
+  });
+
+  it("fails to upsert posts when the author is missing", async () => {
+    const authorId = UserId(1n);
+    const postId = PostId(10n);
+    await expect(
+      upsertPosts(db, [
+        {
+          id: postId,
+          authorId,
+          postedAt: new Date("2024-01-01T00:00:00Z"),
+          text: "hello",
+          lang: "en",
+          rawJson: null,
+        },
+      ]),
+    ).rejects.toThrow();
+  });
+
   it("revives soft-deleted follow edges on upsert", async () => {
     const targetId = UserId(1n);
     const followerId = UserId(2n);
+    await seedUsers(db, [targetId, followerId]);
     await upsertFollows(db, [{ targetId, followerId }]);
     await markFollowersSoftDeleted(db, { targetUserId: targetId, activeFollowerIds: [] });
 
@@ -126,6 +168,7 @@ describe("core repositories", () => {
   it("revives soft-deleted posts on upsert", async () => {
     const postId = PostId(10n);
     const authorId = UserId(1n);
+    await seedUsers(db, [authorId]);
     await upsertPosts(db, [
       {
         id: postId,

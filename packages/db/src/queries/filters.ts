@@ -1,5 +1,5 @@
 import type { SelectQueryBuilder } from "kysely";
-import type { Database } from "../database.js";
+import type { DB as Database } from "../database.js";
 
 export function whereUserActive<O>(
   qb: SelectQueryBuilder<Database, "users", O>,

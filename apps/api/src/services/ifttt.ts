@@ -4,7 +4,6 @@ import {
   insertWebhookFollowEvent,
   upsertFollows,
   upsertFollowsMeta,
-  upsertUserHandle,
   upsertUserProfile,
   upsertUsersMeta,
   withTransaction,
@@ -23,7 +22,6 @@ export interface WebhookFollowResult {
 export async function ingestIftttNewFollower(params: {
   db: Db;
   targetUserId: UserId;
-  targetUserHandle: string;
   followerHandle: string;
   followerProfile: XUserData;
   rawPayload: JsonValue | null;
@@ -48,21 +46,13 @@ export async function ingestIftttNewFollower(params: {
       rawPayload: params.rawPayload,
     });
 
-    await upsertUserHandle(trx, {
-      userId: params.targetUserId,
-      handle: params.targetUserHandle,
-      ingestEventId: ingestEvent.id,
-      ingestKind: ingestEvent.ingestKind,
-      updatedAt: now,
-    });
-
     const { profile } = userProfileInputFromXUser({
       user: params.followerProfile,
       ingestEventId: ingestEvent.id,
       ingestKind: ingestEvent.ingestKind,
       updatedAt: now,
     });
-    if (profile) {
+    if (profile != null) {
       await upsertUserProfile(trx, profile);
     }
 

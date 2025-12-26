@@ -117,6 +117,7 @@ try {
     logger,
     twitterClient,
     postsMaxQueryLength: env.twitterapiIo.maxQueryLength,
+    usersByIdsBatchSize: env.twitterapiIo.batchUsersByIdsMax,
     httpSnapshotMaxBytes: env.retention.httpBodyMaxBytes,
   });
   await runEngineLoop({

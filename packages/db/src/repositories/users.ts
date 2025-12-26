@@ -1,5 +1,6 @@
 import { sql } from "kysely";
 import type { IngestEventId, UserId } from "@bdx/ids";
+import { UserId as UserIdBrand } from "@bdx/ids";
 import type { DbOrTx } from "../db.js";
 import type { IngestKind, JsonValue } from "../database.js";
 import { withTransaction } from "../transactions.js";
@@ -44,36 +45,33 @@ export interface UsersMetaInput {
   updatedAt: Date;
 }
 
-export interface UserHandleInput {
-  userId: UserId;
-  handle: string;
-  ingestEventId: IngestEventId;
-  ingestKind: IngestKind;
-  updatedAt: Date;
+export async function listExistingUserIds(
+  db: DbOrTx,
+  userIds: readonly UserId[],
+): Promise<Set<UserId>> {
+  if (userIds.length === 0) return new Set<UserId>();
+
+  const rows = await db.selectFrom("users").select(["id"]).where("id", "in", userIds).execute();
+  return new Set(rows.map((row) => UserIdBrand(row.id)));
 }
 
-export async function ensureUser(db: DbOrTx, params: { id: UserId }): Promise<void> {
-  await db
-    .insertInto("users")
-    .values({
-      id: params.id,
-      is_deleted: false,
-    })
-    .onConflict((oc) => oc.column("id").doUpdateSet({ is_deleted: false }))
+export async function listUserHandlesByIds(
+  db: DbOrTx,
+  userIds: readonly UserId[],
+): Promise<Map<UserId, string | null>> {
+  if (userIds.length === 0) return new Map<UserId, string | null>();
+
+  const rows = await db
+    .selectFrom("users")
+    .select(["id", "handle"])
+    .where("id", "in", userIds)
     .execute();
-}
 
-export async function ensureUsers(db: DbOrTx, ids: UserId[]): Promise<number> {
-  if (ids.length === 0) return 0;
-
-  const values = ids.map((id) => ({ id, is_deleted: false }));
-  const result = await db
-    .insertInto("users")
-    .values(values)
-    .onConflict((oc) => oc.column("id").doUpdateSet({ is_deleted: false }))
-    .executeTakeFirst();
-
-  return Number(result.numInsertedOrUpdatedRows ?? 0n);
+  const handles = new Map<UserId, string | null>();
+  for (const row of rows) {
+    handles.set(UserIdBrand(row.id), row.handle);
+  }
+  return handles;
 }
 
 function normalizeHandle(handle: string | null): string | null {
@@ -200,85 +198,6 @@ export async function upsertUserProfile(db: DbOrTx, input: UserProfileInput): Pr
         .insertInto("user_handle_history")
         .values({
           user_id: input.id,
-          previous_handle: existing.handle ?? "",
-          new_handle: handle,
-          ingest_event_id: input.ingestEventId,
-          recorded_at: input.updatedAt,
-        })
-        .execute();
-    }
-  });
-}
-
-export async function upsertUserHandle(db: DbOrTx, input: UserHandleInput): Promise<void> {
-  await withTransaction(db, async (trx) => {
-    const handle = normalizeHandle(input.handle);
-    const existing = await trx
-      .selectFrom("users")
-      .select(["handle"])
-      .where("id", "=", input.userId)
-      .executeTakeFirst();
-
-    const stolen =
-      handle === null
-        ? []
-        : await trx
-            .selectFrom("users")
-            .select(["id", "handle"])
-            .where("id", "!=", input.userId)
-            .where("handle_norm", "=", handle.toLowerCase())
-            .execute();
-
-    if (handle) {
-      await trx
-        .updateTable("users")
-        .set({ handle: null })
-        .where("id", "!=", input.userId)
-        .where("handle_norm", "=", handle.toLowerCase())
-        .execute();
-    }
-
-    if (stolen.length > 0) {
-      await trx
-        .insertInto("user_handle_history")
-        .values(
-          stolen.map((row) => ({
-            user_id: row.id,
-            previous_handle: row.handle ?? "",
-            new_handle: "",
-            ingest_event_id: input.ingestEventId,
-            recorded_at: input.updatedAt,
-          })),
-        )
-        .execute();
-    }
-
-    await trx
-      .insertInto("users")
-      .values({
-        id: input.userId,
-        handle,
-        is_deleted: false,
-        last_ingest_event_id: input.ingestEventId,
-        last_ingest_kind: input.ingestKind,
-        last_updated_at: input.updatedAt,
-      })
-      .onConflict((oc) =>
-        oc.column("id").doUpdateSet({
-          handle,
-          is_deleted: false,
-          last_ingest_event_id: input.ingestEventId,
-          last_ingest_kind: input.ingestKind,
-          last_updated_at: input.updatedAt,
-        }),
-      )
-      .execute();
-
-    if (existing && handle && existing.handle !== handle) {
-      await trx
-        .insertInto("user_handle_history")
-        .values({
-          user_id: input.userId,
           previous_handle: existing.handle ?? "",
           new_handle: handle,
           ingest_event_id: input.ingestEventId,

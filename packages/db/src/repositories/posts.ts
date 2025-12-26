@@ -5,7 +5,6 @@ import type { CursorPage, CursorParams } from "../pagination.js";
 import { paginateQuery } from "../pagination.js";
 import { wherePostActive } from "../queries/filters.js";
 import { postSummaryColumns } from "../queries/projections.js";
-import { ensureUsers } from "./users.js";
 import type { IngestEventId, PostId, UserId } from "@bdx/ids";
 import { PostId as PostIdBrand, UserId as UserIdBrand } from "@bdx/ids";
 
@@ -46,14 +45,15 @@ export async function getActivePostIdsByAuthors(
   return new Set(rows.map((row) => PostIdBrand(row.id)));
 }
 
+export async function listExistingPostIds(db: DbOrTx, postIds: PostId[]): Promise<Set<PostId>> {
+  if (postIds.length === 0) return new Set();
+
+  const rows = await db.selectFrom("posts").select(["id"]).where("id", "in", postIds).execute();
+  return new Set(rows.map((row) => PostIdBrand(row.id)));
+}
+
 export async function upsertPosts(db: DbOrTx, rows: PostInput[]): Promise<number> {
   if (rows.length === 0) return 0;
-
-  const authorIds = new Set<UserId>();
-  for (const row of rows) {
-    authorIds.add(row.authorId);
-  }
-  await ensureUsers(db, Array.from(authorIds));
 
   const values = rows.map((row) => ({
     id: row.id,

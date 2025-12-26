@@ -1,8 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type StartedPostgreSqlContainer, PostgreSqlContainer } from "@testcontainers/postgresql";
-import { createDb, destroyDb, migrateToLatest, type Db } from "../../index.js";
-import { UserId } from "@bdx/ids";
-import { ensureUsers } from "../users.js";
+import {
+  createDb,
+  destroyDb,
+  migrateToLatest,
+  upsertUserProfile,
+  type Db,
+  type IngestKind,
+  type UserProfileInput,
+} from "../../index.js";
+import { IngestEventId, UserId } from "@bdx/ids";
 import { getOrCreateAssetParams } from "./params.js";
 import { getOrCreateAssetInstance } from "./instances.js";
 import {
@@ -11,6 +18,71 @@ import {
   getSegmentMembershipAsOf,
 } from "./membership.js";
 import { createAssetMaterialization, updateAssetMaterialization } from "./materializations.js";
+
+async function createIngestEvent(db: Db, ingestKind: IngestKind): Promise<IngestEventId> {
+  const row = await db
+    .insertInto("ingest_events")
+    .values({ ingest_kind: ingestKind })
+    .returning(["id"])
+    .executeTakeFirstOrThrow();
+  return IngestEventId(row.id);
+}
+
+function buildUserProfileInput(params: {
+  id: UserId;
+  handle: string;
+  ingestEventId: IngestEventId;
+  ingestKind: IngestKind;
+}): UserProfileInput {
+  return {
+    id: params.id,
+    handle: params.handle,
+    displayName: null,
+    profileUrl: null,
+    profileImageUrl: null,
+    coverImageUrl: null,
+    bio: null,
+    location: null,
+    isBlueVerified: null,
+    verifiedType: null,
+    isTranslator: null,
+    isAutomated: null,
+    automatedBy: null,
+    possiblySensitive: null,
+    unavailable: null,
+    unavailableMessage: null,
+    unavailableReason: null,
+    followersCount: null,
+    followingCount: null,
+    favouritesCount: null,
+    mediaCount: null,
+    statusesCount: null,
+    userCreatedAt: null,
+    bioEntities: null,
+    affiliatesHighlightedLabel: null,
+    pinnedTweetIds: null,
+    withheldCountries: null,
+    ingestEventId: params.ingestEventId,
+    ingestKind: params.ingestKind,
+    updatedAt: new Date("2024-01-01T00:00:00Z"),
+  };
+}
+
+async function seedUsers(db: Db, userIds: UserId[]): Promise<void> {
+  if (userIds.length === 0) return;
+  const ingestEventId = await createIngestEvent(db, "twitterio_api_users_by_ids");
+  for (const userId of userIds) {
+    await upsertUserProfile(
+      db,
+      buildUserProfileInput({
+        id: userId,
+        handle: `user${userId.toString()}`,
+        ingestEventId,
+        ingestKind: "twitterio_api_users_by_ids",
+      }),
+    );
+  }
+}
 
 describe("segment membership as-of reads", () => {
   let container: StartedPostgreSqlContainer;
@@ -67,7 +139,7 @@ describe("segment membership as-of reads", () => {
     const user101 = UserId(101n);
     const user102 = UserId(102n);
     const user103 = UserId(103n);
-    await ensureUsers(db, [user101, user102, user103]);
+    await seedUsers(db, [user101, user102, user103]);
 
     const params = await getOrCreateAssetParams(db, {
       assetSlug: "segment_specified_users",

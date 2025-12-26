@@ -9,8 +9,13 @@ import {
 } from "@bdx/db";
 import type { UserId } from "@bdx/ids";
 import { parseAssetMaterializationId, parseIngestEventId } from "@bdx/ids";
-import type { PinoLoggerOptions } from "@bdx/observability";
-import Fastify, { type FastifyInstance } from "fastify";
+import type { Logger } from "@bdx/observability";
+import Fastify, {
+  type FastifyInstance,
+  type RawReplyDefaultExpression,
+  type RawRequestDefaultExpression,
+  type RawServerDefault,
+} from "fastify";
 import { z } from "zod";
 import {
   OpenAPIRegistry,
@@ -25,6 +30,11 @@ import {
   type TwitterApiClient,
   type XUserData,
 } from "@bdx/twitterapi-io";
+import {
+  UsersHydrationError,
+  UsersHydrationRateLimitError,
+  UsersHydrationService,
+} from "@bdx/ingest";
 import { ingestIftttNewFollower } from "./services/ifttt.js";
 
 extendZodWithOpenApi(z);
@@ -208,15 +218,35 @@ function extractHandleFromProfileLink(link: string): string | null {
   return handle.length > 0 ? handle : null;
 }
 
+type ApiServer = FastifyInstance<
+  RawServerDefault,
+  RawRequestDefaultExpression,
+  RawReplyDefaultExpression,
+  Logger
+>;
+
 export function buildServer(params: {
   db: Db;
-  loggerOptions: PinoLoggerOptions;
+  logger: Logger;
   webhookToken: string;
   twitterClient: TwitterApiClient;
   xSelf: { userId: UserId; handle: string };
-}): FastifyInstance {
-  const server = Fastify({
-    logger: params.loggerOptions,
+  usersByIdsBatchSize: number;
+}): ApiServer {
+  const server: ApiServer = Fastify<
+    RawServerDefault,
+    RawRequestDefaultExpression,
+    RawReplyDefaultExpression,
+    Logger
+  >({
+    loggerInstance: params.logger,
+  });
+
+  const usersHydrationService = new UsersHydrationService({
+    db: params.db,
+    logger: params.logger,
+    client: params.twitterClient,
+    batchSize: params.usersByIdsBatchSize,
   });
 
   const registry = new OpenAPIRegistry();
@@ -415,10 +445,26 @@ export function buildServer(params: {
     }
 
     try {
+      await usersHydrationService.hydrateUsersByIds({ userIds: [params.xSelf.userId] });
+    } catch (error) {
+      if (error instanceof UsersHydrationRateLimitError) {
+        const retryAfter = Math.trunc(error.retryAfterSeconds ?? 60);
+        return reply
+          .status(503)
+          .headers({ "Retry-After": String(retryAfter) })
+          .send({ error: "Upstream rate limited" });
+      }
+      if (error instanceof UsersHydrationError) {
+        return reply.status(502).send({ error: "Upstream request failed" });
+      }
+      request.log.error({ error }, "Unexpected twitterapi.io hydration error");
+      return reply.status(500).send({ error: "Internal server error" });
+    }
+
+    try {
       const result = await ingestIftttNewFollower({
         db: params.db,
         targetUserId: params.xSelf.userId,
-        targetUserHandle: params.xSelf.handle,
         followerHandle: handle,
         followerProfile: profile,
         rawPayload: payloadResult.data,

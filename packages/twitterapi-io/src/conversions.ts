@@ -2,6 +2,8 @@ import type {
   FollowersItem,
   FollowingsItem,
   TweetItem,
+  TweetAuthor,
+  TweetsByIdsItem,
   UserBatchItem,
   UserInfoData,
 } from "./api_types.js";
@@ -65,7 +67,7 @@ function parseDate(value: unknown): Date | null {
 }
 
 export function convertUser(
-  item: UserInfoData | UserBatchItem | FollowersItem | FollowingsItem,
+  item: UserInfoData | UserBatchItem | FollowersItem | FollowingsItem | TweetAuthor,
 ): XUserData {
   const profileBio = asJsonObject("profile_bio" in item ? item.profile_bio : null);
   const affiliates = asJsonObject(
@@ -103,17 +105,20 @@ export function convertUser(
   };
 }
 
-export function convertTweet(item: TweetItem): TweetData | null {
+export function convertTweet(item: TweetItem | TweetsByIdsItem): TweetData | null {
   const tweetId = toPostId(item.id);
-  const authorId = toUserId(item.author?.id);
+  const author = item.author;
+  const authorId = toUserId(author?.id);
   if (!tweetId || !authorId) return null;
 
   const createdAt = parseDate(item.createdAt) ?? new Date();
   const raw = asJsonObject(item) ?? {};
+  const authorProfile = author ? convertUser(author) : null;
 
   return {
     postId: tweetId,
     authorUserId: authorId,
+    authorProfile,
     createdAt,
     text: toString(item.text),
     lang: toString(item.lang),

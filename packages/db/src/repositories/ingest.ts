@@ -1,8 +1,7 @@
 import type { DbOrTx } from "../db.js";
 import type { FollowsSyncMode, IngestKind, JsonValue, SyncRunStatus } from "../database.js";
 import { withTransaction } from "../transactions.js";
-import { ensureUser } from "./users.js";
-import type { AssetMaterializationId, IngestEventId, UserId } from "@bdx/ids";
+import type { AssetMaterializationId, IngestEventId, PostId, UserId } from "@bdx/ids";
 import { IngestEventId as IngestEventIdBrand, UserId as UserIdBrand } from "@bdx/ids";
 
 export interface IngestEventRecord {
@@ -27,6 +26,14 @@ export interface FollowingsSyncRunInput {
 
 export interface PostsSyncRunInput {
   ingestKind: IngestKind;
+  status?: SyncRunStatus;
+}
+
+export interface UsersByIdsHydrationRunInput {
+  status?: SyncRunStatus;
+}
+
+export interface PostsByIdsHydrationRunInput {
   status?: SyncRunStatus;
 }
 
@@ -141,7 +148,6 @@ export async function createFollowersSyncRun(
   input: FollowersSyncRunInput,
 ): Promise<IngestEventRecord> {
   return withTransaction(db, async (trx) => {
-    await ensureUser(trx, { id: input.targetUserId });
     const event = await createIngestEvent(trx, input.ingestKind);
 
     await trx
@@ -163,7 +169,6 @@ export async function createFollowingsSyncRun(
   input: FollowingsSyncRunInput,
 ): Promise<IngestEventRecord> {
   return withTransaction(db, async (trx) => {
-    await ensureUser(trx, { id: input.sourceUserId });
     const event = await createIngestEvent(trx, input.ingestKind);
 
     await trx
@@ -197,6 +202,120 @@ export async function createPostsSyncRun(
 
     return event;
   });
+}
+
+export async function createUsersByIdsHydrationRun(
+  db: DbOrTx,
+  input: UsersByIdsHydrationRunInput = {},
+): Promise<IngestEventRecord> {
+  return withTransaction(db, async (trx) => {
+    const event = await createIngestEvent(trx, "twitterio_api_users_by_ids");
+
+    await trx
+      .insertInto("users_by_ids_hydration_runs")
+      .values({
+        ingest_event_id: event.id,
+        status: input.status ?? "in_progress",
+      })
+      .execute();
+
+    return event;
+  });
+}
+
+export async function addUsersByIdsHydrationRunRequestedUsers(
+  db: DbOrTx,
+  ingestEventId: IngestEventId,
+  userIds: readonly UserId[],
+): Promise<number> {
+  if (userIds.length === 0) return 0;
+
+  const values = userIds.map((userId) => ({
+    users_by_ids_hydration_run_id: ingestEventId,
+    user_id: userId,
+  }));
+
+  const result = await db
+    .insertInto("users_by_ids_hydration_run_requested_users")
+    .values(values)
+    .onConflict((oc) => oc.columns(["users_by_ids_hydration_run_id", "user_id"]).doNothing())
+    .executeTakeFirst();
+
+  return Number(result.numInsertedOrUpdatedRows ?? 0n);
+}
+
+export async function updateUsersByIdsHydrationRun(
+  db: DbOrTx,
+  ingestEventId: IngestEventId,
+  input: SyncRunUpdateInput,
+): Promise<number> {
+  const update = buildSyncRunUpdate(input);
+  if (Object.keys(update).length === 0) return 0;
+
+  const result = await db
+    .updateTable("users_by_ids_hydration_runs")
+    .set(update)
+    .where("ingest_event_id", "=", ingestEventId)
+    .executeTakeFirst();
+
+  return Number(result.numUpdatedRows);
+}
+
+export async function createPostsByIdsHydrationRun(
+  db: DbOrTx,
+  input: PostsByIdsHydrationRunInput = {},
+): Promise<IngestEventRecord> {
+  return withTransaction(db, async (trx) => {
+    const event = await createIngestEvent(trx, "twitterio_api_posts_by_ids");
+
+    await trx
+      .insertInto("posts_by_ids_hydration_runs")
+      .values({
+        ingest_event_id: event.id,
+        status: input.status ?? "in_progress",
+      })
+      .execute();
+
+    return event;
+  });
+}
+
+export async function addPostsByIdsHydrationRunRequestedPosts(
+  db: DbOrTx,
+  ingestEventId: IngestEventId,
+  postIds: readonly PostId[],
+): Promise<number> {
+  if (postIds.length === 0) return 0;
+
+  const values = postIds.map((postId) => ({
+    posts_by_ids_hydration_run_id: ingestEventId,
+    post_id: postId,
+  }));
+
+  const result = await db
+    .insertInto("posts_by_ids_hydration_run_requested_posts")
+    .values(values)
+    .onConflict((oc) => oc.columns(["posts_by_ids_hydration_run_id", "post_id"]).doNothing())
+    .executeTakeFirst();
+
+  return Number(result.numInsertedOrUpdatedRows ?? 0n);
+}
+
+export async function updatePostsByIdsHydrationRun(
+  db: DbOrTx,
+  ingestEventId: IngestEventId,
+  input: SyncRunUpdateInput,
+): Promise<number> {
+  const update = buildSyncRunUpdate(input);
+  if (Object.keys(update).length === 0) return 0;
+
+  const result = await db
+    .updateTable("posts_by_ids_hydration_runs")
+    .set(update)
+    .where("ingest_event_id", "=", ingestEventId)
+    .executeTakeFirst();
+
+  return Number(result.numUpdatedRows);
 }
 
 type SyncRunUpdateRow = {
@@ -420,10 +539,6 @@ export async function insertWebhookFollowEvent(
 ): Promise<IngestEventRecord> {
   return withTransaction(db, async (trx) => {
     const event = await createIngestEvent(trx, ingestKind);
-    await ensureUser(trx, { id: input.targetUserId });
-    if (input.followerUserId !== null) {
-      await ensureUser(trx, { id: input.followerUserId });
-    }
 
     await trx
       .insertInto("webhook_follow_events")

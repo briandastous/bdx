@@ -10,7 +10,6 @@ import {
   createPostsSyncRun,
   destroyDb,
   enableAssetInstanceRoot,
-  ensureUsers,
   getLatestSuccessfulMaterialization,
   getOrCreateAssetInstance,
   getOrCreateAssetParams,
@@ -22,9 +21,12 @@ import {
   updateAssetMaterialization,
   updateFollowersSyncRun,
   upsertPosts,
+  upsertUserProfile,
   type Db,
+  type IngestKind,
+  type UserProfileInput,
 } from "@bdx/db";
-import { AssetInstanceId, PostId, UserId } from "@bdx/ids";
+import { AssetInstanceId, IngestEventId, PostId, UserId } from "@bdx/ids";
 import { createLogger } from "@bdx/observability";
 import { TwitterApiClient } from "@bdx/twitterapi-io";
 import { AssetEngine } from "./engine.js";
@@ -76,6 +78,71 @@ function captureStdout() {
   };
 }
 
+async function createIngestEvent(db: Db, ingestKind: IngestKind): Promise<IngestEventId> {
+  const row = await db
+    .insertInto("ingest_events")
+    .values({ ingest_kind: ingestKind })
+    .returning(["id"])
+    .executeTakeFirstOrThrow();
+  return IngestEventId(row.id);
+}
+
+function buildUserProfileInput(params: {
+  id: UserId;
+  handle: string;
+  ingestEventId: IngestEventId;
+  ingestKind: IngestKind;
+}): UserProfileInput {
+  return {
+    id: params.id,
+    handle: params.handle,
+    displayName: null,
+    profileUrl: null,
+    profileImageUrl: null,
+    coverImageUrl: null,
+    bio: null,
+    location: null,
+    isBlueVerified: null,
+    verifiedType: null,
+    isTranslator: null,
+    isAutomated: null,
+    automatedBy: null,
+    possiblySensitive: null,
+    unavailable: null,
+    unavailableMessage: null,
+    unavailableReason: null,
+    followersCount: null,
+    followingCount: null,
+    favouritesCount: null,
+    mediaCount: null,
+    statusesCount: null,
+    userCreatedAt: null,
+    bioEntities: null,
+    affiliatesHighlightedLabel: null,
+    pinnedTweetIds: null,
+    withheldCountries: null,
+    ingestEventId: params.ingestEventId,
+    ingestKind: params.ingestKind,
+    updatedAt: new Date("2024-01-01T00:00:00Z"),
+  };
+}
+
+async function seedUsers(db: Db, userIds: UserId[]): Promise<void> {
+  if (userIds.length === 0) return;
+  const ingestEventId = await createIngestEvent(db, "twitterio_api_users_by_ids");
+  for (const userId of userIds) {
+    await upsertUserProfile(
+      db,
+      buildUserProfileInput({
+        id: userId,
+        handle: `user${userId.toString()}`,
+        ingestEventId,
+        ingestKind: "twitterio_api_users_by_ids",
+      }),
+    );
+  }
+}
+
 describe("AssetEngine materialization", () => {
   let container: StartedPostgreSqlContainer;
   let db: Db;
@@ -99,7 +166,7 @@ describe("AssetEngine materialization", () => {
     const user101 = UserId(101n);
     const user102 = UserId(102n);
     const user103 = UserId(103n);
-    await ensureUsers(db, [user101, user102, user103]);
+    await seedUsers(db, [user101, user102, user103]);
 
     const params: AssetParams = {
       assetSlug: "segment_specified_users",
@@ -122,7 +189,7 @@ describe("AssetEngine materialization", () => {
 
     await replaceSpecifiedUsersInputs(db, {
       instanceId: instance.id,
-      userExternalIds: [user101, user102],
+      userIds: [user101, user102],
     });
     await enableAssetInstanceRoot(db, instance.id);
 
@@ -136,6 +203,7 @@ describe("AssetEngine materialization", () => {
       logger,
       twitterClient,
       postsMaxQueryLength: 512,
+      usersByIdsBatchSize: 100,
     });
 
     await engine.tick(new AbortController().signal);
@@ -173,7 +241,7 @@ describe("AssetEngine materialization", () => {
 
     await replaceSpecifiedUsersInputs(db, {
       instanceId: instance.id,
-      userExternalIds: [user102, user103],
+      userIds: [user102, user103],
     });
 
     await engine.tick(new AbortController().signal);
@@ -213,7 +281,7 @@ describe("AssetEngine materialization", () => {
   it("emits structured logs with materialization IDs", async () => {
     const user201 = UserId(201n);
     const user202 = UserId(202n);
-    await ensureUsers(db, [user201, user202]);
+    await seedUsers(db, [user201, user202]);
 
     const params: AssetParams = {
       assetSlug: "segment_specified_users",
@@ -236,7 +304,7 @@ describe("AssetEngine materialization", () => {
 
     await replaceSpecifiedUsersInputs(db, {
       instanceId: instance.id,
-      userExternalIds: [user201, user202],
+      userIds: [user201, user202],
     });
     await enableAssetInstanceRoot(db, instance.id);
 
@@ -252,6 +320,7 @@ describe("AssetEngine materialization", () => {
       logger,
       twitterClient,
       postsMaxQueryLength: 512,
+      usersByIdsBatchSize: 100,
     });
 
     await engine.materializeInstanceById(instance.id);
@@ -271,7 +340,7 @@ describe("AssetEngine materialization", () => {
 
   it("repairs checkpoints when membership pointers are missing", async () => {
     const user201 = UserId(201n);
-    await ensureUsers(db, [user201]);
+    await seedUsers(db, [user201]);
 
     const params: AssetParams = {
       assetSlug: "segment_specified_users",
@@ -321,6 +390,7 @@ describe("AssetEngine materialization", () => {
       logger,
       twitterClient,
       postsMaxQueryLength: 512,
+      usersByIdsBatchSize: 100,
     });
 
     await engine.materializeInstanceById(instance.id, { triggerReason: "checkpoint" });
@@ -340,7 +410,7 @@ describe("AssetEngine materialization", () => {
     const member901 = UserId(901n);
     const member902 = UserId(902n);
     const members = [member901, member902];
-    await ensureUsers(db, members);
+    await seedUsers(db, members);
 
     const post9001 = PostId(9001n);
     const post9002 = PostId(9002n);
@@ -395,7 +465,7 @@ describe("AssetEngine materialization", () => {
 
     await replaceSpecifiedUsersInputs(db, {
       instanceId: segmentInstance.id,
-      userExternalIds: members,
+      userIds: members,
     });
     await enableAssetInstanceRoot(db, segmentInstance.id);
 
@@ -409,6 +479,7 @@ describe("AssetEngine materialization", () => {
       logger,
       twitterClient,
       postsMaxQueryLength: 512,
+      usersByIdsBatchSize: 100,
     });
 
     await engine.tick(new AbortController().signal);
@@ -460,6 +531,7 @@ describe("AssetEngine materialization", () => {
       logger,
       twitterClient,
       postsMaxQueryLength: 512,
+      usersByIdsBatchSize: 100,
     });
 
     const missingInstanceId = AssetInstanceId(999999n);
@@ -538,6 +610,7 @@ describe("AssetEngine materialization", () => {
       twitterClient,
       postsMaxQueryLength: 512,
       lockTimeoutMs: 50,
+      usersByIdsBatchSize: 100,
     });
 
     const outcome = await engine.materializeInstanceById(instance.id, {
@@ -562,7 +635,7 @@ describe("AssetEngine materialization", () => {
 
   it("uses incremental follower syncs after a full refresh exists", async () => {
     const targetUserId = UserId(42n);
-    await ensureUsers(db, [targetUserId]);
+    await seedUsers(db, [targetUserId]);
 
     const fullRun = await createFollowersSyncRun(db, {
       targetUserId,
@@ -615,6 +688,7 @@ describe("AssetEngine materialization", () => {
       logger,
       twitterClient,
       postsMaxQueryLength: 512,
+      usersByIdsBatchSize: 100,
     });
 
     await engine.materializeParams({
@@ -634,9 +708,84 @@ describe("AssetEngine materialization", () => {
     expect(latestRun.sync_mode).toBe("incremental");
   });
 
+  it("uses a full refresh when the latest followers run failed", async () => {
+    const targetUserId = UserId(43n);
+    await seedUsers(db, [targetUserId]);
+
+    const failedRun = await createFollowersSyncRun(db, {
+      targetUserId,
+      ingestKind: "twitterio_api_user_followers",
+      syncMode: "full_refresh",
+    });
+    await updateFollowersSyncRun(db, failedRun.id, {
+      status: "error",
+      completedAt: new Date(),
+      cursorExhausted: false,
+      lastApiStatus: "500",
+      lastApiError: "boom",
+    });
+
+    const twitterClient = new TwitterApiClient({
+      token: "test-token",
+      baseUrl: "https://example.test",
+      minIntervalMs: 0,
+      fetch: (input) => {
+        const requestUrl =
+          typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        const url = new URL(requestUrl);
+        if (url.pathname === "/twitter/user/batch_info_by_ids") {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                users: [{ id: targetUserId.toString(), userName: "target", name: "Target" }],
+              }),
+              { status: 200 },
+            ),
+          );
+        }
+        if (url.pathname === "/twitter/user/followers") {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                followers: [{ id: "100", userName: "follower", name: "Follower" }],
+              }),
+              { status: 200 },
+            ),
+          );
+        }
+        return Promise.resolve(new Response("{}", { status: 200 }));
+      },
+    });
+
+    const logger = createLogger({ env: "test", level: "silent", service: "engine-test" });
+    const engine = new AssetEngine({
+      db,
+      logger,
+      twitterClient,
+      postsMaxQueryLength: 512,
+      usersByIdsBatchSize: 100,
+    });
+
+    await engine.materializeParams({
+      assetSlug: "segment_followers",
+      subjectExternalId: targetUserId,
+      fanoutSourceParamsHash: null,
+    });
+
+    const latestRun = await db
+      .selectFrom("followers_sync_runs")
+      .select(["sync_mode"])
+      .where("target_user_id", "=", targetUserId)
+      .orderBy("ingest_event_id", "desc")
+      .limit(1)
+      .executeTakeFirstOrThrow();
+
+    expect(latestRun.sync_mode).toBe("full_refresh");
+  });
+
   it("materializes dependency closures for mutuals segments", async () => {
     const subjectUserId = UserId(77n);
-    await ensureUsers(db, [subjectUserId]);
+    await seedUsers(db, [subjectUserId]);
 
     const twitterClient = new TwitterApiClient({
       token: "test-token",
@@ -676,6 +825,7 @@ describe("AssetEngine materialization", () => {
       logger,
       twitterClient,
       postsMaxQueryLength: 512,
+      usersByIdsBatchSize: 100,
     });
 
     await engine.materializeParams({
@@ -703,7 +853,7 @@ describe("AssetEngine materialization", () => {
 
   it("records ingest lock timeouts when follower syncs are locked", async () => {
     const targetUserId = UserId(505n);
-    await ensureUsers(db, [targetUserId]);
+    await seedUsers(db, [targetUserId]);
 
     const lockDb = createDb(container.getConnectionUri());
     let releaseLock: (() => void) | undefined;
@@ -769,6 +919,7 @@ describe("AssetEngine materialization", () => {
       twitterClient,
       postsMaxQueryLength: 512,
       lockTimeoutMs: 50,
+      usersByIdsBatchSize: 100,
     });
 
     const outcome = await engine.materializeParams({
@@ -805,6 +956,7 @@ describe("AssetEngine materialization", () => {
       logger,
       twitterClient,
       postsMaxQueryLength: 512,
+      usersByIdsBatchSize: 100,
     });
 
     const outcome = await engine.materializeParams({

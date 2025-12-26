@@ -1,6 +1,6 @@
 import type { Transaction } from "kysely";
 import type { DbOrTx } from "./db.js";
-import type { Database } from "./database.js";
+import type { DB as Database } from "./database.js";
 
 function isTransaction(db: DbOrTx): db is Transaction<Database> {
   const candidate = db as { isTransaction?: boolean };

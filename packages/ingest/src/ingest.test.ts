@@ -1,17 +1,27 @@
 import { Buffer } from "node:buffer";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { type StartedPostgreSqlContainer, PostgreSqlContainer } from "@testcontainers/postgresql";
-import { createDb, destroyDb, migrateToLatest, upsertFollows, type Db } from "@bdx/db";
+import {
+  createDb,
+  destroyDb,
+  migrateToLatest,
+  upsertFollows,
+  upsertUserProfile,
+  type Db,
+  type IngestKind,
+  type JsonValue as DbJsonValue,
+  type UserProfileInput,
+} from "@bdx/db";
 import { createLogger } from "@bdx/observability";
-import { TwitterApiClient, type JsonValue } from "@bdx/twitterapi-io";
-import { PostId, UserId } from "@bdx/ids";
+import { TwitterApiClient, type JsonValue as TwitterJsonValue } from "@bdx/twitterapi-io";
+import { IngestEventId, PostId, UserId } from "@bdx/ids";
 import { FollowersSyncService } from "./followers.js";
 import { FollowingsSyncService } from "./followings.js";
 import { PostsSyncService } from "./posts.js";
 
 type FixtureResponse = {
   path: string;
-  body: JsonValue;
+  body: TwitterJsonValue;
   status?: number;
 };
 
@@ -47,6 +57,10 @@ function createClientWithFixtures(responses: FixtureResponse[]): TwitterApiClien
 }
 
 async function resetDb(db: Db): Promise<void> {
+  await db.deleteFrom("users_by_ids_hydration_run_requested_users").execute();
+  await db.deleteFrom("users_by_ids_hydration_runs").execute();
+  await db.deleteFrom("posts_by_ids_hydration_run_requested_posts").execute();
+  await db.deleteFrom("posts_by_ids_hydration_runs").execute();
   await db.deleteFrom("follows_meta").execute();
   await db.deleteFrom("follows").execute();
   await db.deleteFrom("posts_meta").execute();
@@ -61,7 +75,7 @@ async function resetDb(db: Db): Promise<void> {
   await db.deleteFrom("users").execute();
 }
 
-function assertJsonObject(value: JsonValue | null): asserts value is Record<string, JsonValue> {
+function assertJsonObject(value: DbJsonValue | null): asserts value is Record<string, DbJsonValue> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Expected JSON object");
   }
@@ -113,6 +127,71 @@ function captureStdout() {
   };
 }
 
+async function createIngestEvent(db: Db, ingestKind: IngestKind): Promise<IngestEventId> {
+  const row = await db
+    .insertInto("ingest_events")
+    .values({ ingest_kind: ingestKind })
+    .returning(["id"])
+    .executeTakeFirstOrThrow();
+  return IngestEventId(row.id);
+}
+
+function buildUserProfileInput(params: {
+  id: UserId;
+  handle: string;
+  ingestEventId: IngestEventId;
+  ingestKind: IngestKind;
+}): UserProfileInput {
+  return {
+    id: params.id,
+    handle: params.handle,
+    displayName: null,
+    profileUrl: null,
+    profileImageUrl: null,
+    coverImageUrl: null,
+    bio: null,
+    location: null,
+    isBlueVerified: null,
+    verifiedType: null,
+    isTranslator: null,
+    isAutomated: null,
+    automatedBy: null,
+    possiblySensitive: null,
+    unavailable: null,
+    unavailableMessage: null,
+    unavailableReason: null,
+    followersCount: null,
+    followingCount: null,
+    favouritesCount: null,
+    mediaCount: null,
+    statusesCount: null,
+    userCreatedAt: null,
+    bioEntities: null,
+    affiliatesHighlightedLabel: null,
+    pinnedTweetIds: null,
+    withheldCountries: null,
+    ingestEventId: params.ingestEventId,
+    ingestKind: params.ingestKind,
+    updatedAt: new Date("2024-01-01T00:00:00Z"),
+  };
+}
+
+async function seedUsers(db: Db, userIds: UserId[]): Promise<void> {
+  if (userIds.length === 0) return;
+  const ingestEventId = await createIngestEvent(db, "twitterio_api_users_by_ids");
+  for (const userId of userIds) {
+    await upsertUserProfile(
+      db,
+      buildUserProfileInput({
+        id: userId,
+        handle: `user${userId.toString()}`,
+        ingestEventId,
+        ingestKind: "twitterio_api_users_by_ids",
+      }),
+    );
+  }
+}
+
 describe("ingest services", () => {
   let container: StartedPostgreSqlContainer;
   let db: Db;
@@ -140,6 +219,7 @@ describe("ingest services", () => {
     const targetUserId = UserId(1n);
     const followerId = UserId(10n);
     const missingFollowerId = UserId(20n);
+    await seedUsers(db, [targetUserId, followerId, missingFollowerId]);
     await upsertFollows(db, [
       { targetId: targetUserId, followerId },
       { targetId: targetUserId, followerId: missingFollowerId },
@@ -214,6 +294,40 @@ describe("ingest services", () => {
     ]);
   });
 
+  it("hydrates followers on an empty database", async () => {
+    const targetUserId = UserId(1n);
+    const followerId = UserId(10n);
+    const client = createClientWithFixtures([
+      {
+        path: "/twitter/user/batch_info_by_ids",
+        body: { users: [{ id: "1", userName: "target", name: "Target" }] },
+      },
+      {
+        path: "/twitter/user/followers",
+        body: {
+          followers: [{ id: "10", userName: "follower", name: "Follower" }],
+          next_cursor: null,
+        },
+      },
+    ]);
+
+    const logger = createLogger({ env: "test", level: "silent", service: "ingest-test" });
+    const service = new FollowersSyncService({ db, logger, client });
+    await service.syncFollowersFull({ targetUserId });
+
+    const users = await db
+      .selectFrom("users")
+      .select(["id", "last_updated_at"])
+      .orderBy("id", "asc")
+      .execute();
+
+    expect(users).toHaveLength(2);
+    expect(users.map((row) => row.id)).toEqual([targetUserId, followerId]);
+    for (const row of users) {
+      expect(row.last_updated_at).not.toBeNull();
+    }
+  });
+
   it("records truncated http response bodies on failures", async () => {
     const targetUserId = UserId(1n);
     const largePayload = { error: "x".repeat(5000) };
@@ -261,6 +375,7 @@ describe("ingest services", () => {
     const sourceUserId = UserId(1n);
     const followedId = UserId(10n);
     const missingFollowedId = UserId(20n);
+    await seedUsers(db, [sourceUserId, followedId, missingFollowedId]);
     await upsertFollows(db, [
       { targetId: followedId, followerId: sourceUserId },
       { targetId: missingFollowedId, followerId: sourceUserId },
@@ -327,6 +442,40 @@ describe("ingest services", () => {
     ]);
   });
 
+  it("hydrates followings on an empty database", async () => {
+    const sourceUserId = UserId(1n);
+    const followedId = UserId(10n);
+    const client = createClientWithFixtures([
+      {
+        path: "/twitter/user/batch_info_by_ids",
+        body: { users: [{ id: "1", userName: "source", name: "Source" }] },
+      },
+      {
+        path: "/twitter/user/followings",
+        body: {
+          followings: [{ id: "10", userName: "followed", name: "Followed" }],
+          next_cursor: null,
+        },
+      },
+    ]);
+
+    const logger = createLogger({ env: "test", level: "silent", service: "ingest-test" });
+    const service = new FollowingsSyncService({ db, logger, client });
+    await service.syncFollowingsFull({ sourceUserId });
+
+    const users = await db
+      .selectFrom("users")
+      .select(["id", "last_updated_at"])
+      .orderBy("id", "asc")
+      .execute();
+
+    expect(users).toHaveLength(2);
+    expect(users.map((row) => row.id)).toEqual([sourceUserId, followedId]);
+    for (const row of users) {
+      expect(row.last_updated_at).not.toBeNull();
+    }
+  });
+
   it("emits structured logs for ingest runs", async () => {
     const targetUserId = UserId(1n);
     const client = createClientWithFixtures([
@@ -391,6 +540,7 @@ describe("ingest services", () => {
       logger,
       client,
       maxQueryLength: 1024,
+      batchUsersByIdsMax: 100,
     });
 
     const result = await service.syncPostsFull({ userIds: [authorUserId] });
@@ -434,6 +584,9 @@ describe("ingest services", () => {
       .select(["user_id", "ingest_event_id"])
       .orderBy("user_id", "asc")
       .execute();
-    expect(userMeta).toEqual([{ user_id: authorUserId, ingest_event_id: result.syncRunId }]);
+    expect(userMeta).toContainEqual({
+      user_id: authorUserId,
+      ingest_event_id: result.syncRunId,
+    });
   });
 });

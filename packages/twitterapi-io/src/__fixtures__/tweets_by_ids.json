@@ -1,0 +1,15 @@
+{
+  "tweets": [
+    {
+      "id": "900",
+      "text": "Hydration test",
+      "createdAt": "2024-02-02T00:00:00Z",
+      "lang": "en",
+      "author": {
+        "id": "777",
+        "userName": "hydrated_author",
+        "name": "Hydrated Author"
+      }
+    }
+  ]
+}

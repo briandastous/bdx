@@ -33,6 +33,8 @@ twitterapiIo:
   baseUrl: https://api.twitterapi.io
   rateLimitQps: 1
   maxQueryLength: 512
+  batchUsersByIdsMax: 100
+  batchPostsByIdsMax: 100
 
 x:
   self:

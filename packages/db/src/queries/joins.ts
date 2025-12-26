@@ -1,5 +1,5 @@
 import type { JoinReferenceExpression, SelectQueryBuilder } from "kysely";
-import type { Database } from "../database.js";
+import type { DB as Database } from "../database.js";
 
 const assetInstancesJoin = "asset_instances as instances" as const;
 const assetParamsJoin = "asset_params as params" as const;

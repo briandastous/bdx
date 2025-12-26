@@ -12,6 +12,7 @@ Authoritative upstream docs are vendored:
 - Built output: `packages/db/dist/migrations/`
 
 Naming:
+
 - Use a zero-padded numeric prefix so alphanumeric order matches execution order (e.g. `0002_create_users.ts`).
 
 ## How to write a migration
@@ -22,6 +23,7 @@ Each file exports:
 - `down(db: Kysely<any>): Promise<void>`
 
 Guidelines:
+
 - Use `Kysely<any>` (migrations are “frozen in time” and must not depend on the evolving `Database` type).
 - Prefer Kysely’s schema builder; use `sql` only when needed for Postgres-specific features.
 - Avoid importing application code into migrations.
@@ -33,6 +35,7 @@ This repo provides:
 - `packages/db/src/migrate.ts` (`migrateToLatest`, `migrateToLatestWithLock`)
 
 Policy:
+
 - Local dev: migrations may be run via CLI or automatically by the worker.
 - Staging/prod: migrations should run from the worker only (guarded by an advisory lock), with `RUN_MIGRATIONS=false` as a kill switch.
 
@@ -49,6 +52,18 @@ Run migrations once:
 Auto-migrate on worker start:
 
 - Set `RUN_MIGRATIONS=true` (default is `true`).
+
+## Backfill hydrated users (when enforcing NOT NULL)
+
+If a migration enforces `users.last_updated_at NOT NULL`, hydrate any legacy placeholder rows
+before running migrations:
+
+1. Query missing rows:
+   - `docker compose exec -T db psql -U bdx -d bdx -c "select id from users where last_updated_at is null order by id;"`
+2. Hydrate those IDs via the CLI (requires a real `TWITTERAPI_IO_TOKEN`):
+   - `(set -a; source .env.local; set +a; node packages/cli/dist/bin.js ingest:users --user-ids "123,456" --force)`
+3. Verify:
+   - `docker compose exec -T db psql -U bdx -d bdx -c "select count(*) from users where last_updated_at is null;"`
 
 ## Baseline reset
 

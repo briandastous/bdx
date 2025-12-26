@@ -2,7 +2,7 @@ import type { Transaction } from "kysely";
 import { Kysely } from "kysely";
 import { PostgresJSDialect } from "kysely-postgres-js";
 import postgres from "postgres";
-import type { Database } from "./database.js";
+import type { DB as Database } from "./database.js";
 
 export type Db = Kysely<Database>;
 export type DbOrTx = Db | Transaction<Database>;

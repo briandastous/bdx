@@ -120,6 +120,14 @@ describe("TwitterApiClient", () => {
     expect(user?.userName).toBe("alice");
   });
 
+  it("fetches batch users by ids", async () => {
+    const payload = loadFixture("./__fixtures__/user_batch.json");
+    const client = createClient(() => new Response(JSON.stringify(payload), { status: 200 }));
+
+    const users = await client.fetchUsersByIds([UserId(101n)]);
+    expect(users.get(UserId(101n))?.userName).toBe("alice");
+  });
+
   it("parses posts fixtures into typed pages", async () => {
     const payload = loadFixture("./__fixtures__/posts_page.json");
     const client = createClient(() => new Response(JSON.stringify(payload), { status: 200 }));
@@ -127,5 +135,15 @@ describe("TwitterApiClient", () => {
     const page = await client.fetchPostsPage("from:alice");
     expect(page.posts[0]?.postId).toBe(PostId(500n));
     expect(page.posts[0]?.authorUserId).toBe(UserId(101n));
+  });
+
+  it("fetches tweets by ids", async () => {
+    const payload = loadFixture("./__fixtures__/tweets_by_ids.json");
+    const client = createClient(() => new Response(JSON.stringify(payload), { status: 200 }));
+
+    const tweets = await client.fetchTweetsByIds([PostId(900n)]);
+    expect(tweets[0]?.postId).toBe(PostId(900n));
+    expect(tweets[0]?.authorUserId).toBe(UserId(777n));
+    expect(tweets[0]?.authorProfile?.userName).toBe("hydrated_author");
   });
 });

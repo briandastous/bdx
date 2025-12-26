@@ -43,6 +43,7 @@ export default class IngestPosts extends Command {
         logger,
         client,
         maxQueryLength: env.twitterapiIo.maxQueryLength,
+        batchUsersByIdsMax: env.twitterapiIo.batchUsersByIdsMax,
         httpSnapshotMaxBytes: env.retention.httpBodyMaxBytes,
       });
 

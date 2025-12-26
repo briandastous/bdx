@@ -4,7 +4,7 @@ export type {
   AssetInstanceFanoutMode,
   AssetMaterializationStatus,
   AssetSlug,
-  Database,
+  DB as Database,
   FollowsSyncMode,
   IngestKind,
   JsonValue,

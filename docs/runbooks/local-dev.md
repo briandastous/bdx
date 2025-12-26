@@ -69,7 +69,7 @@ Build the CLI:
 
 Seed users for specified-users segments (needed for the example below):
 
-- `docker compose exec -T db psql -U bdx -d bdx -c "insert into users (id, is_deleted) values (111, false), (222, false) on conflict (id) do update set is_deleted = false;"`
+- `(set -a; source .env.local; set +a; node packages/cli/dist/bin.js ingest:users --user-ids "111,222")`
 
 Enable a root instance:
 
@@ -107,8 +107,8 @@ Inspect the latest materializations:
 - **Postgres 18 volumes**: the Compose file mounts `/var/lib/postgresql`. If you change it to
   `/var/lib/postgresql/data`, Postgres 18 will refuse to start with a data directory error.
 - **CLI command IDs**: use `assets:roots:enable` (not `assets:roots enable`) and similar `:` commands.
-- **Specified users**: `segment_specified_users` requires the referenced `users` rows to exist. Seed
-  the users before running `worker:tick` to avoid transaction errors.
+- **Specified users**: `segment_specified_users` requires hydrated `users` rows. Use
+  `ingest:users` to hydrate IDs before running `worker:tick`.
 - **Ingest tokens**: `ingest:*` commands require a real `TWITTERAPI_IO_TOKEN` to hit the API.
 - **Env pollution**: wrap commands with `(set -a; source .env.local; set +a; ...)` to avoid leaking
   variables into your parent shell.

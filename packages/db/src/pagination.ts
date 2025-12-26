@@ -1,4 +1,9 @@
-import type { OrderByDirection, ReferenceExpression, SelectQueryBuilder, StringReference } from "kysely";
+import type {
+  OrderByDirection,
+  ReferenceExpression,
+  SelectQueryBuilder,
+  StringReference,
+} from "kysely";
 import {
   base64UrlCodec,
   codecPipe,
@@ -8,7 +13,7 @@ import {
   type CursorIncoming,
   type PaginatedResult,
 } from "kysely-cursor";
-import type { Database } from "./database.js";
+import type { DB as Database } from "./database.js";
 
 export const cursorCodec = codecPipe(superJsonCodec, base64UrlCodec);
 

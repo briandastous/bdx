@@ -8,19 +8,19 @@ export async function listSpecifiedUsersInputs(
 ): Promise<UserId[]> {
   const rows = await db
     .selectFrom("segment_specified_users_inputs")
-    .select(["user_external_id"])
+    .select(["user_id"])
     .where("instance_id", "=", instanceId)
-    .orderBy("user_external_id", "asc")
+    .orderBy("user_id", "asc")
     .execute();
 
-  return rows.map((row) => UserIdBrand(row.user_external_id));
+  return rows.map((row) => UserIdBrand(row.user_id));
 }
 
 export async function replaceSpecifiedUsersInputs(
   db: DbOrTx,
-  params: { instanceId: AssetInstanceId; userExternalIds: Iterable<UserId> },
+  params: { instanceId: AssetInstanceId; userIds: Iterable<UserId> },
 ): Promise<number> {
-  const ids = Array.from(new Set(params.userExternalIds)).sort((a, b) => (a < b ? -1 : 1));
+  const ids = Array.from(new Set(params.userIds)).sort((a, b) => (a < b ? -1 : 1));
 
   await db
     .deleteFrom("segment_specified_users_inputs")
@@ -31,7 +31,7 @@ export async function replaceSpecifiedUsersInputs(
 
   const values = ids.map((userId) => ({
     instance_id: params.instanceId,
-    user_external_id: userId,
+    user_id: userId,
   }));
 
   const result = await db

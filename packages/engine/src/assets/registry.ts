@@ -90,7 +90,7 @@ const specifiedUsers: AssetDefinition = {
   ingestRequirements: () => [],
   inputsHashParts: async (_params, context) => {
     const ids = await listSpecifiedUsersInputs(context.db, context.instanceId);
-    return ids.map((id) => `user_external_id=${id.toString()}`);
+    return ids.map((id) => `user_id=${id.toString()}`);
   },
   computeMembership: async (_params, _deps, context) => {
     const ids = await listSpecifiedUsersInputs(context.db, context.instanceId);

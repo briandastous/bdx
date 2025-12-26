@@ -1,12 +1,67 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { type StartedPostgreSqlContainer, PostgreSqlContainer } from "@testcontainers/postgresql";
 import {
-  type StartedPostgreSqlContainer,
-  PostgreSqlContainer,
-} from "@testcontainers/postgresql";
-import { createDb, destroyDb, migrateToLatest, type Db } from "./index.js";
+  createDb,
+  destroyDb,
+  migrateToLatest,
+  upsertUserProfile,
+  type Db,
+  type IngestKind,
+  type UserProfileInput,
+} from "./index.js";
 import { paginateQuery } from "./pagination.js";
+import { IngestEventId, UserId } from "@bdx/ids";
 
-const userId = 1n;
+const userId = UserId(1n);
+
+async function createIngestEvent(db: Db, ingestKind: IngestKind): Promise<IngestEventId> {
+  const row = await db
+    .insertInto("ingest_events")
+    .values({ ingest_kind: ingestKind })
+    .returning(["id"])
+    .executeTakeFirstOrThrow();
+  return IngestEventId(row.id);
+}
+
+function buildUserProfileInput(params: {
+  id: UserId;
+  handle: string;
+  ingestEventId: IngestEventId;
+  ingestKind: IngestKind;
+}): UserProfileInput {
+  return {
+    id: params.id,
+    handle: params.handle,
+    displayName: null,
+    profileUrl: null,
+    profileImageUrl: null,
+    coverImageUrl: null,
+    bio: null,
+    location: null,
+    isBlueVerified: null,
+    verifiedType: null,
+    isTranslator: null,
+    isAutomated: null,
+    automatedBy: null,
+    possiblySensitive: null,
+    unavailable: null,
+    unavailableMessage: null,
+    unavailableReason: null,
+    followersCount: null,
+    followingCount: null,
+    favouritesCount: null,
+    mediaCount: null,
+    statusesCount: null,
+    userCreatedAt: null,
+    bioEntities: null,
+    affiliatesHighlightedLabel: null,
+    pinnedTweetIds: null,
+    withheldCountries: null,
+    ingestEventId: params.ingestEventId,
+    ingestKind: params.ingestKind,
+    updatedAt: new Date("2024-01-01T00:00:00.000Z"),
+  };
+}
 
 describe("paginateQuery", () => {
   let container: StartedPostgreSqlContainer;
@@ -20,7 +75,16 @@ describe("paginateQuery", () => {
       .start();
     db = createDb(container.getConnectionUri());
     await migrateToLatest(db);
-    await db.insertInto("users").values({ id: userId }).execute();
+    const ingestEventId = await createIngestEvent(db, "twitterio_api_users_by_ids");
+    await upsertUserProfile(
+      db,
+      buildUserProfileInput({
+        id: userId,
+        handle: "user1",
+        ingestEventId,
+        ingestKind: "twitterio_api_users_by_ids",
+      }),
+    );
     await db
       .insertInto("posts")
       .values([

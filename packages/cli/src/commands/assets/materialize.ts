@@ -50,6 +50,7 @@ export default class AssetsMaterialize extends Command {
         logger,
         twitterClient,
         postsMaxQueryLength: env.twitterapiIo.maxQueryLength,
+        usersByIdsBatchSize: env.twitterapiIo.batchUsersByIdsMax,
         httpSnapshotMaxBytes: env.retention.httpBodyMaxBytes,
       });
 

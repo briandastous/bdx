@@ -1,7 +1,6 @@
 import { sql } from "kysely";
 import type { DbOrTx } from "../db.js";
 import type { IngestKind } from "../database.js";
-import { ensureUsers } from "./users.js";
 import type { IngestEventId, UserId } from "@bdx/ids";
 import { UserId as UserIdBrand } from "@bdx/ids";
 
@@ -20,13 +19,6 @@ export interface FollowsMetaInput {
 
 export async function upsertFollows(db: DbOrTx, rows: FollowEdgeInput[]): Promise<number> {
   if (rows.length === 0) return 0;
-
-  const userIds = new Set<UserId>();
-  for (const row of rows) {
-    userIds.add(row.targetId);
-    userIds.add(row.followerId);
-  }
-  await ensureUsers(db, Array.from(userIds));
 
   const values = rows.map((row) => ({
     target_id: row.targetId,

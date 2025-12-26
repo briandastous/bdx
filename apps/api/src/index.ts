@@ -1,11 +1,11 @@
 import { loadApiEnv } from "@bdx/config";
 import { createDb, destroyDb } from "@bdx/db";
-import { createPinoOptions } from "@bdx/observability";
+import { createLogger } from "@bdx/observability";
 import { TwitterApiClient } from "@bdx/twitterapi-io";
 import { buildServer } from "./server.js";
 
 const env = loadApiEnv();
-const loggerOptions = createPinoOptions({ env: env.DEPLOY_ENV, level: env.LOG_LEVEL, service: "api" });
+const logger = createLogger({ env: env.DEPLOY_ENV, level: env.LOG_LEVEL, service: "api" });
 
 const db = createDb(env.DATABASE_URL, env.db);
 const twitterClient = new TwitterApiClient({
@@ -15,10 +15,11 @@ const twitterClient = new TwitterApiClient({
 });
 const server = buildServer({
   db,
-  loggerOptions,
+  logger,
   webhookToken: env.WEBHOOK_TOKEN,
   twitterClient,
   xSelf: env.x.self,
+  usersByIdsBatchSize: env.twitterapiIo.batchUsersByIdsMax,
 });
 
 let shuttingDown = false;

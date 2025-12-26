@@ -71,6 +71,7 @@ export interface FollowingsPage {
 export interface TweetData {
   postId: PostId;
   authorUserId: UserId;
+  authorProfile: XUserData | null;
   createdAt: Date;
   text: string | null;
   lang: string | null;
