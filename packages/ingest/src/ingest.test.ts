@@ -57,10 +57,10 @@ function createClientWithFixtures(responses: FixtureResponse[]): TwitterApiClien
 }
 
 async function resetDb(db: Db): Promise<void> {
-  await db.deleteFrom("users_by_ids_hydration_run_requested_users").execute();
-  await db.deleteFrom("users_by_ids_hydration_runs").execute();
-  await db.deleteFrom("posts_by_ids_hydration_run_requested_posts").execute();
-  await db.deleteFrom("posts_by_ids_hydration_runs").execute();
+  await db.deleteFrom("users_by_ids_ingest_run_requested_users").execute();
+  await db.deleteFrom("users_by_ids_ingest_runs").execute();
+  await db.deleteFrom("posts_by_ids_ingest_run_requested_posts").execute();
+  await db.deleteFrom("posts_by_ids_ingest_runs").execute();
   await db.deleteFrom("follows_meta").execute();
   await db.deleteFrom("follows").execute();
   await db.deleteFrom("posts_meta").execute();

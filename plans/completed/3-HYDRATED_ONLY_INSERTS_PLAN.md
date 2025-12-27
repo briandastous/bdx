@@ -41,7 +41,7 @@ This plan is scoped to the current rewrite repo (`bdx`). Key references:
 - Introduce ingest-layer wrappers for:
   - user hydration by user IDs (`/twitter/user/batch_info_by_ids`),
   - post hydration by post IDs (`/twitter/tweets`) (implemented now for symmetry/future assets, even if not required yet).
-- Ensure existing ingest services (followers/followings/posts) delegate to user-hydration when a workflow needs a user row
+- Ensure existing ingest services (followers/followings/posts) delegate to users-by-ids ingest when a workflow needs a user row
   but doesn’t already have full user profile data available.
 - Preserve current asset definitions and their `ingestRequirements` shape; any hydration needed for FK safety happens
   outside the asset API for this pass.
@@ -72,7 +72,7 @@ This plan is scoped to the current rewrite repo (`bdx`). Key references:
 - `users.last_updated_at` is `NOT NULL` at the schema level (added after legacy placeholders are hydrated).
   - Migration strategy (non-destructive): add a migration that asserts `count(*) where last_updated_at is null = 0`, then
     `ALTER TABLE users ALTER COLUMN last_updated_at SET NOT NULL`.
-  - Operator workflow (outside migrations): use the new user-hydration CLI/service to hydrate any existing `users` rows
+  - Operator workflow (outside migrations): use the new users-by-ids ingest CLI/service to hydrate any existing `users` rows
     with `last_updated_at IS NULL` before applying the constraint.
   - Rationale: nullable `last_updated_at` is a durable “placeholder marker” that undermines the invariant, but we should
     not rely on destructive truncation in dev once real data exists.
@@ -150,7 +150,7 @@ Concrete test changes (by file):
 
 ### New ingest wrappers (first pass)
 
-- `UsersHydrationService` (new):
+- `UsersByIdsIngestService` (new):
   - input: `userIds: UserId[]`
   - predicate: **needs hydration = row missing** (do not use `last_updated_at`; the steady state makes it `NOT NULL`)
   - backfill mode: support an explicit “force hydrate existing rows” mode for legacy cleanup (used to hydrate historical
@@ -161,7 +161,7 @@ Concrete test changes (by file):
     - **fail the hydration run if any requested IDs are absent from the response** (do not silently ignore),
     - upsert via `upsertUserProfile` (+ `users_meta`)
   - output: set of hydrated IDs + explicit errors for missing IDs / upstream failures
-- `PostsHydrationService` (new):
+- `PostsByIdsIngestService` (new):
   - input: `postIds: PostId[]`
   - effect:
     - fetch posts via `/twitter/tweets` (batched) using a **comma-separated** `tweet_ids` query param,
@@ -171,9 +171,9 @@ Concrete test changes (by file):
 ### Delegation from existing ingest services
 
 - Followers/followings sync:
-  - delegates to `UsersHydrationService` when a workflow needs a user row for FK safety but only has an ID/handle.
+  - delegates to `UsersByIdsIngestService` when a workflow needs a user row for FK safety but only has an ID/handle.
 - Posts sync:
-  - uses `UsersHydrationService` (batch) to hydrate target users before writing `posts_sync_run_target_users` and posts.
+  - uses `UsersByIdsIngestService` (batch) to hydrate target users before writing `posts_sync_run_target_users` and posts.
   - if the search API returns a post whose `author_id` is outside the requested target set, hydrate+store anyway but log a
     warning (unexpected author).
 - Webhook ingest:
@@ -243,7 +243,7 @@ once placeholder helpers are removed.
 - [x] Extend configuration:
   - add `twitterapiIo.batchUsersByIdsMax` to `config/base.yaml` (and thread it through `packages/config` so it’s available
     on `WorkerEnv`).
-- [x] Implement `UsersHydrationService` in `packages/ingest`:
+- [x] Implement `UsersByIdsIngestService` in `packages/ingest`:
   - batches requests to the API limit,
   - uses a configurable batch size from `config/base.yaml` (e.g. `twitterapiIo.batchUsersByIdsMax`),
   - upserts `users` via `upsertUserProfile`,
@@ -268,7 +268,7 @@ once placeholder helpers are removed.
   - `packages/cli/src/commands/assets/roots/enable.ts`:
     - load `WorkerEnv` (requires `TWITTERAPI_IO_TOKEN`) to construct a twitter client for hydration,
     - query for which IDs already exist in `users`,
-    - call `UsersHydrationService` for the missing IDs,
+    - call `UsersByIdsIngestService` for the missing IDs,
     - only then call `replaceSpecifiedUsersInputs`.
   - Update any tests that call `replaceSpecifiedUsersInputs` to either pre-create users (via `upsertUserProfile`) or to
     stub hydration.
@@ -287,7 +287,7 @@ once placeholder helpers are removed.
 - [x] Extend configuration:
   - add `twitterapiIo.batchPostsByIdsMax` to `config/base.yaml` (and thread it through `packages/config` so it’s
     available on `WorkerEnv`).
-- [x] Implement `PostsHydrationService` in `packages/ingest`:
+- [x] Implement `PostsByIdsIngestService` in `packages/ingest`:
   - uses a configurable batch size from `config/base.yaml` (e.g. `twitterapiIo.batchPostsByIdsMax`),
   - upserts posts via `upsertPosts`,
   - ensures author users are hydrated from the embedded author payloads.
@@ -327,7 +327,7 @@ once placeholder helpers are removed.
 
 - [x] Add a CLI/service workflow to hydrate specific user IDs (from Phase 2) and document the dev backfill steps:
   - Query for placeholders: `select id from users where last_updated_at is null order by id;`
-  - Hydrate those IDs via the new user-hydration CLI/service in **force** mode (so existing placeholder rows are updated).
+  - Hydrate those IDs via the new users-by-ids ingest CLI/service in **force** mode (so existing placeholder rows are updated).
   - Verify: `select count(*) from users where last_updated_at is null;` returns 0.
 - [x] Add a migration that enforces `users.last_updated_at NOT NULL` (and fails fast if any nulls remain).
 - [x] Add/extend an integration test that runs `migrateToLatest` and asserts the `NOT NULL` constraint is present.

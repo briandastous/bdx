@@ -29,11 +29,11 @@ export interface PostsSyncRunInput {
   status?: SyncRunStatus;
 }
 
-export interface UsersByIdsHydrationRunInput {
+export interface UsersByIdsIngestRunInput {
   status?: SyncRunStatus;
 }
 
-export interface PostsByIdsHydrationRunInput {
+export interface PostsByIdsIngestRunInput {
   status?: SyncRunStatus;
 }
 
@@ -204,15 +204,15 @@ export async function createPostsSyncRun(
   });
 }
 
-export async function createUsersByIdsHydrationRun(
+export async function createUsersByIdsIngestRun(
   db: DbOrTx,
-  input: UsersByIdsHydrationRunInput = {},
+  input: UsersByIdsIngestRunInput = {},
 ): Promise<IngestEventRecord> {
   return withTransaction(db, async (trx) => {
     const event = await createIngestEvent(trx, "twitterio_api_users_by_ids");
 
     await trx
-      .insertInto("users_by_ids_hydration_runs")
+      .insertInto("users_by_ids_ingest_runs")
       .values({
         ingest_event_id: event.id,
         status: input.status ?? "in_progress",
@@ -223,7 +223,7 @@ export async function createUsersByIdsHydrationRun(
   });
 }
 
-export async function addUsersByIdsHydrationRunRequestedUsers(
+export async function addUsersByIdsIngestRunRequestedUsers(
   db: DbOrTx,
   ingestEventId: IngestEventId,
   userIds: readonly UserId[],
@@ -231,20 +231,20 @@ export async function addUsersByIdsHydrationRunRequestedUsers(
   if (userIds.length === 0) return 0;
 
   const values = userIds.map((userId) => ({
-    users_by_ids_hydration_run_id: ingestEventId,
+    users_by_ids_ingest_run_id: ingestEventId,
     user_id: userId,
   }));
 
   const result = await db
-    .insertInto("users_by_ids_hydration_run_requested_users")
+    .insertInto("users_by_ids_ingest_run_requested_users")
     .values(values)
-    .onConflict((oc) => oc.columns(["users_by_ids_hydration_run_id", "user_id"]).doNothing())
+    .onConflict((oc) => oc.columns(["users_by_ids_ingest_run_id", "user_id"]).doNothing())
     .executeTakeFirst();
 
   return Number(result.numInsertedOrUpdatedRows ?? 0n);
 }
 
-export async function updateUsersByIdsHydrationRun(
+export async function updateUsersByIdsIngestRun(
   db: DbOrTx,
   ingestEventId: IngestEventId,
   input: SyncRunUpdateInput,
@@ -253,7 +253,7 @@ export async function updateUsersByIdsHydrationRun(
   if (Object.keys(update).length === 0) return 0;
 
   const result = await db
-    .updateTable("users_by_ids_hydration_runs")
+    .updateTable("users_by_ids_ingest_runs")
     .set(update)
     .where("ingest_event_id", "=", ingestEventId)
     .executeTakeFirst();
@@ -261,15 +261,15 @@ export async function updateUsersByIdsHydrationRun(
   return Number(result.numUpdatedRows);
 }
 
-export async function createPostsByIdsHydrationRun(
+export async function createPostsByIdsIngestRun(
   db: DbOrTx,
-  input: PostsByIdsHydrationRunInput = {},
+  input: PostsByIdsIngestRunInput = {},
 ): Promise<IngestEventRecord> {
   return withTransaction(db, async (trx) => {
     const event = await createIngestEvent(trx, "twitterio_api_posts_by_ids");
 
     await trx
-      .insertInto("posts_by_ids_hydration_runs")
+      .insertInto("posts_by_ids_ingest_runs")
       .values({
         ingest_event_id: event.id,
         status: input.status ?? "in_progress",
@@ -280,7 +280,7 @@ export async function createPostsByIdsHydrationRun(
   });
 }
 
-export async function addPostsByIdsHydrationRunRequestedPosts(
+export async function addPostsByIdsIngestRunRequestedPosts(
   db: DbOrTx,
   ingestEventId: IngestEventId,
   postIds: readonly PostId[],
@@ -288,20 +288,20 @@ export async function addPostsByIdsHydrationRunRequestedPosts(
   if (postIds.length === 0) return 0;
 
   const values = postIds.map((postId) => ({
-    posts_by_ids_hydration_run_id: ingestEventId,
+    posts_by_ids_ingest_run_id: ingestEventId,
     post_id: postId,
   }));
 
   const result = await db
-    .insertInto("posts_by_ids_hydration_run_requested_posts")
+    .insertInto("posts_by_ids_ingest_run_requested_posts")
     .values(values)
-    .onConflict((oc) => oc.columns(["posts_by_ids_hydration_run_id", "post_id"]).doNothing())
+    .onConflict((oc) => oc.columns(["posts_by_ids_ingest_run_id", "post_id"]).doNothing())
     .executeTakeFirst();
 
   return Number(result.numInsertedOrUpdatedRows ?? 0n);
 }
 
-export async function updatePostsByIdsHydrationRun(
+export async function updatePostsByIdsIngestRun(
   db: DbOrTx,
   ingestEventId: IngestEventId,
   input: SyncRunUpdateInput,
@@ -310,7 +310,7 @@ export async function updatePostsByIdsHydrationRun(
   if (Object.keys(update).length === 0) return 0;
 
   const result = await db
-    .updateTable("posts_by_ids_hydration_runs")
+    .updateTable("posts_by_ids_ingest_runs")
     .set(update)
     .where("ingest_event_id", "=", ingestEventId)
     .executeTakeFirst();

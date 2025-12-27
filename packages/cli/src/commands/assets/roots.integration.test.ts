@@ -36,10 +36,10 @@ function restoreEnv(snapshot: EnvSnapshot): void {
 }
 
 async function resetDb(db: Db): Promise<void> {
-  await db.deleteFrom("users_by_ids_hydration_run_requested_users").execute();
-  await db.deleteFrom("users_by_ids_hydration_runs").execute();
-  await db.deleteFrom("posts_by_ids_hydration_run_requested_posts").execute();
-  await db.deleteFrom("posts_by_ids_hydration_runs").execute();
+  await db.deleteFrom("users_by_ids_ingest_run_requested_users").execute();
+  await db.deleteFrom("users_by_ids_ingest_runs").execute();
+  await db.deleteFrom("posts_by_ids_ingest_run_requested_posts").execute();
+  await db.deleteFrom("posts_by_ids_ingest_runs").execute();
   await db.deleteFrom("ingest_events").execute();
   await db.deleteFrom("users_meta").execute();
   await db.deleteFrom("user_handle_history").execute();

@@ -31,9 +31,9 @@ import {
   type XUserData,
 } from "@bdx/twitterapi-io";
 import {
-  UsersHydrationError,
-  UsersHydrationRateLimitError,
-  UsersHydrationService,
+  UsersByIdsIngestError,
+  UsersByIdsIngestRateLimitError,
+  UsersByIdsIngestService,
 } from "@bdx/ingest";
 import { ingestIftttNewFollower } from "./services/ifttt.js";
 
@@ -242,7 +242,7 @@ export function buildServer(params: {
     loggerInstance: params.logger,
   });
 
-  const usersHydrationService = new UsersHydrationService({
+  const usersByIdsIngestService = new UsersByIdsIngestService({
     db: params.db,
     logger: params.logger,
     client: params.twitterClient,
@@ -445,19 +445,19 @@ export function buildServer(params: {
     }
 
     try {
-      await usersHydrationService.hydrateUsersByIds({ userIds: [params.xSelf.userId] });
+      await usersByIdsIngestService.ingestUsersByIds({ userIds: [params.xSelf.userId] });
     } catch (error) {
-      if (error instanceof UsersHydrationRateLimitError) {
+      if (error instanceof UsersByIdsIngestRateLimitError) {
         const retryAfter = Math.trunc(error.retryAfterSeconds ?? 60);
         return reply
           .status(503)
           .headers({ "Retry-After": String(retryAfter) })
           .send({ error: "Upstream rate limited" });
       }
-      if (error instanceof UsersHydrationError) {
+      if (error instanceof UsersByIdsIngestError) {
         return reply.status(502).send({ error: "Upstream request failed" });
       }
-      request.log.error({ error }, "Unexpected twitterapi.io hydration error");
+      request.log.error({ error }, "Unexpected twitterapi.io users-by-ids ingest error");
       return reply.status(500).send({ error: "Internal server error" });
     }
 

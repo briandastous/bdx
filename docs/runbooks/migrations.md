@@ -53,14 +53,14 @@ Auto-migrate on worker start:
 
 - Set `RUN_MIGRATIONS=true` (default is `true`).
 
-## Backfill hydrated users (when enforcing NOT NULL)
+## Backfill users (when enforcing NOT NULL)
 
-If a migration enforces `users.last_updated_at NOT NULL`, hydrate any legacy placeholder rows
+If a migration enforces `users.last_updated_at NOT NULL`, ingest any legacy placeholder rows
 before running migrations:
 
 1. Query missing rows:
    - `docker compose exec -T db psql -U bdx -d bdx -c "select id from users where last_updated_at is null order by id;"`
-2. Hydrate those IDs via the CLI (requires a real `TWITTERAPI_IO_TOKEN`):
+2. Ingest those IDs via the CLI (requires a real `TWITTERAPI_IO_TOKEN`):
    - `(set -a; source .env.local; set +a; node packages/cli/dist/bin.js ingest:users --user-ids "123,456" --force)`
 3. Verify:
    - `docker compose exec -T db psql -U bdx -d bdx -c "select count(*) from users where last_updated_at is null;"`

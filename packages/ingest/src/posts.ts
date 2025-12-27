@@ -23,9 +23,9 @@ import type { Logger } from "@bdx/observability";
 import { TwitterApiError, TwitterApiRateLimitError } from "@bdx/twitterapi-io";
 import type { TweetData, TwitterApiClient } from "@bdx/twitterapi-io";
 import {
-  UsersHydrationError,
-  UsersHydrationRateLimitError,
-  UsersHydrationService,
+  UsersByIdsIngestError,
+  UsersByIdsIngestRateLimitError,
+  UsersByIdsIngestService,
 } from "./hydration.js";
 import { userProfileInputFromXUser } from "./graph_sync.js";
 import { resolveHttpBodyMaxBytes, sanitizeHttpExchange } from "./http_snapshot.js";
@@ -73,7 +73,7 @@ export class PostsSyncService {
   private readonly client: TwitterApiClient;
   private readonly maxQueryLength: number;
   private readonly httpSnapshotMaxBytes: number;
-  private readonly usersHydration: UsersHydrationService;
+  private readonly usersByIdsIngest: UsersByIdsIngestService;
 
   constructor(params: {
     db: Db;
@@ -95,7 +95,7 @@ export class PostsSyncService {
       params.httpSnapshotMaxBytes !== undefined
         ? { httpSnapshotMaxBytes: params.httpSnapshotMaxBytes }
         : {};
-    this.usersHydration = new UsersHydrationService({
+    this.usersByIdsIngest = new UsersByIdsIngestService({
       db: params.db,
       logger: params.logger,
       client: params.client,
@@ -141,7 +141,7 @@ export class PostsSyncService {
     );
 
     try {
-      await this.ensureTargetsHydrated(uniqueUserIds);
+      await this.ensureTargetUsersIngested(uniqueUserIds);
       await addPostsSyncRunTargetUsers(this.db, syncRunId, uniqueUserIds);
     } catch (error) {
       await this.recordFailure(syncRunId, error, params.since);
@@ -329,18 +329,18 @@ export class PostsSyncService {
     return result;
   }
 
-  private async ensureTargetsHydrated(userIds: UserId[]): Promise<void> {
+  private async ensureTargetUsersIngested(userIds: UserId[]): Promise<void> {
     try {
-      await this.usersHydration.hydrateUsersByIds({ userIds });
+      await this.usersByIdsIngest.ingestUsersByIds({ userIds });
     } catch (error) {
-      if (error instanceof UsersHydrationRateLimitError) {
+      if (error instanceof UsersByIdsIngestRateLimitError) {
         throw new PostsSyncRateLimitError(error.message, {
           retryAfterSeconds: error.retryAfterSeconds,
           original: error,
         });
       }
-      if (error instanceof UsersHydrationError) {
-        throw new PostsSyncError(error.message, { status: "user-hydration", original: error });
+      if (error instanceof UsersByIdsIngestError) {
+        throw new PostsSyncError(error.message, { status: "users-by-ids-ingest", original: error });
       }
       throw error;
     }

@@ -107,8 +107,8 @@ Inspect the latest materializations:
 - **Postgres 18 volumes**: the Compose file mounts `/var/lib/postgresql`. If you change it to
   `/var/lib/postgresql/data`, Postgres 18 will refuse to start with a data directory error.
 - **CLI command IDs**: use `assets:roots:enable` (not `assets:roots enable`) and similar `:` commands.
-- **Specified users**: `segment_specified_users` requires hydrated `users` rows. Use
-  `ingest:users` to hydrate IDs before running `worker:tick`.
+- **Specified users**: `segment_specified_users` requires `users` rows. Use `ingest:users` to ingest IDs before running
+  `worker:tick`.
 - **Ingest tokens**: `ingest:*` commands require a real `TWITTERAPI_IO_TOKEN` to hit the API.
 - **Env pollution**: wrap commands with `(set -a; source .env.local; set +a; ...)` to avoid leaking
   variables into your parent shell.

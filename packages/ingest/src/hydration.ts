@@ -8,14 +8,14 @@ import type {
   UsersMetaInput,
 } from "@bdx/db";
 import {
-  addPostsByIdsHydrationRunRequestedPosts,
-  addUsersByIdsHydrationRunRequestedUsers,
-  createPostsByIdsHydrationRun,
-  createUsersByIdsHydrationRun,
+  addPostsByIdsIngestRunRequestedPosts,
+  addUsersByIdsIngestRunRequestedUsers,
+  createPostsByIdsIngestRun,
+  createUsersByIdsIngestRun,
   listExistingPostIds,
   listExistingUserIds,
-  updatePostsByIdsHydrationRun,
-  updateUsersByIdsHydrationRun,
+  updatePostsByIdsIngestRun,
+  updateUsersByIdsIngestRun,
   upsertPosts,
   upsertPostsMeta,
   upsertUserProfile,
@@ -32,22 +32,22 @@ import { resolveHttpBodyMaxBytes, sanitizeHttpExchange } from "./http_snapshot.j
 const USERS_BY_IDS_INGEST_KIND: IngestKind = "twitterio_api_users_by_ids";
 const POSTS_BY_IDS_INGEST_KIND: IngestKind = "twitterio_api_posts_by_ids";
 
-export interface UsersHydrationResult {
+export interface UsersByIdsIngestResult {
   ingestEventId: IngestEventId | null;
   requestedUserIds: readonly UserId[];
-  hydratedUserIds: readonly UserId[];
+  ingestedUserIds: readonly UserId[];
   skippedUserIds: readonly UserId[];
 }
 
-export interface PostsHydrationResult {
+export interface PostsByIdsIngestResult {
   ingestEventId: IngestEventId | null;
   requestedPostIds: readonly PostId[];
-  hydratedPostIds: readonly PostId[];
+  ingestedPostIds: readonly PostId[];
   skippedPostIds: readonly PostId[];
   authorUserIds: readonly UserId[];
 }
 
-export class UsersHydrationError extends Error {
+export class UsersByIdsIngestError extends Error {
   readonly status: string;
   readonly original: unknown;
 
@@ -59,7 +59,7 @@ export class UsersHydrationError extends Error {
   }
 }
 
-export class UsersHydrationRateLimitError extends UsersHydrationError {
+export class UsersByIdsIngestRateLimitError extends UsersByIdsIngestError {
   readonly retryAfterSeconds: number | null;
 
   constructor(
@@ -71,7 +71,7 @@ export class UsersHydrationRateLimitError extends UsersHydrationError {
   }
 }
 
-export class PostsHydrationError extends Error {
+export class PostsByIdsIngestError extends Error {
   readonly status: string;
   readonly original: unknown;
 
@@ -83,7 +83,7 @@ export class PostsHydrationError extends Error {
   }
 }
 
-export class PostsHydrationRateLimitError extends PostsHydrationError {
+export class PostsByIdsIngestRateLimitError extends PostsByIdsIngestError {
   readonly retryAfterSeconds: number | null;
 
   constructor(
@@ -95,7 +95,7 @@ export class PostsHydrationRateLimitError extends PostsHydrationError {
   }
 }
 
-export class UsersHydrationService {
+export class UsersByIdsIngestService {
   private readonly db: Db;
   private readonly logger: Logger;
   private readonly client: TwitterApiClient;
@@ -119,16 +119,16 @@ export class UsersHydrationService {
     this.httpSnapshotMaxBytes = resolveHttpBodyMaxBytes(params.httpSnapshotMaxBytes);
   }
 
-  async hydrateUsersByIds(params: {
+  async ingestUsersByIds(params: {
     userIds: Iterable<UserId>;
     force?: boolean;
-  }): Promise<UsersHydrationResult> {
+  }): Promise<UsersByIdsIngestResult> {
     const requestedIds = normalizeUserIds(params.userIds);
     if (requestedIds.length === 0) {
       return {
         ingestEventId: null,
         requestedUserIds: [],
-        hydratedUserIds: [],
+        ingestedUserIds: [],
         skippedUserIds: [],
       };
     }
@@ -142,14 +142,14 @@ export class UsersHydrationService {
       return {
         ingestEventId: null,
         requestedUserIds: requestedIds,
-        hydratedUserIds: [],
+        ingestedUserIds: [],
         skippedUserIds: requestedIds,
       };
     }
 
-    const run = await createUsersByIdsHydrationRun(this.db);
+    const run = await createUsersByIdsIngestRun(this.db);
     const ingestEventId = run.id;
-    await addUsersByIdsHydrationRunRequestedUsers(this.db, ingestEventId, missingIds);
+    await addUsersByIdsIngestRunRequestedUsers(this.db, ingestEventId, missingIds);
 
     this.logger.info(
       {
@@ -158,15 +158,15 @@ export class UsersHydrationService {
         run_id: ingestEventId.toString(),
         requestedUserIds: missingIds.map((id) => id.toString()),
       },
-      "Starting users-by-ids hydration",
+      "Starting users-by-ids ingest",
     );
 
     try {
       const result = await this.fetchUsersByIds(missingIds);
       const missing = missingIds.filter((id) => !result.usersById.has(id));
       if (missing.length > 0) {
-        throw new UsersHydrationError(
-          `Hydration response missing ${missing.length} user id(s): ${missing
+        throw new UsersByIdsIngestError(
+          `Users-by-ids ingest response missing ${missing.length} user id(s): ${missing
             .map((id) => id.toString())
             .join(", ")}`,
           { status: "missing-users" },
@@ -195,7 +195,7 @@ export class UsersHydrationService {
         if (usersMetaRows.length > 0) {
           await upsertUsersMeta(trx, usersMetaRows);
         }
-        await updateUsersByIdsHydrationRun(trx, ingestEventId, {
+        await updateUsersByIdsIngestRun(trx, ingestEventId, {
           status: "success",
           completedAt: now,
           lastApiStatus: "200",
@@ -208,15 +208,15 @@ export class UsersHydrationService {
           ingestKind: USERS_BY_IDS_INGEST_KIND,
           ingestEventId: ingestEventId.toString(),
           run_id: ingestEventId.toString(),
-          hydratedUserIds: missingIds.map((id) => id.toString()),
+          ingestedUserIds: missingIds.map((id) => id.toString()),
         },
-        "Completed users-by-ids hydration",
+        "Completed users-by-ids ingest",
       );
 
       return {
         ingestEventId,
         requestedUserIds: requestedIds,
-        hydratedUserIds: missingIds,
+        ingestedUserIds: missingIds,
         skippedUserIds: requestedIds.filter((id) => !missingIds.includes(id)),
       };
     } catch (error) {
@@ -241,14 +241,14 @@ export class UsersHydrationService {
         }
       } catch (error) {
         if (error instanceof TwitterApiRateLimitError) {
-          throw new UsersHydrationRateLimitError(error.message, {
+          throw new UsersByIdsIngestRateLimitError(error.message, {
             retryAfterSeconds: error.retryAfterSeconds,
             original: error,
           });
         }
         if (error instanceof TwitterApiError) {
           const status = error.status !== undefined ? String(error.status) : "users-by-ids";
-          throw new UsersHydrationError(error.message, { status, original: error });
+          throw new UsersByIdsIngestError(error.message, { status, original: error });
         }
         throw error;
       }
@@ -258,7 +258,7 @@ export class UsersHydrationService {
   }
 
   private async recordFailure(ingestEventId: IngestEventId, error: unknown): Promise<void> {
-    const status = error instanceof UsersHydrationError ? error.status : "exception";
+    const status = error instanceof UsersByIdsIngestError ? error.status : "exception";
     const message = error instanceof Error ? error.message : String(error);
     const completionTime = new Date();
     const last = sanitizeHttpExchange(this.client.lastExchange(), this.httpSnapshotMaxBytes);
@@ -275,11 +275,11 @@ export class UsersHydrationService {
       update.lastHttpResponse = last.response ?? null;
     }
 
-    await updateUsersByIdsHydrationRun(this.db, ingestEventId, update);
+    await updateUsersByIdsIngestRun(this.db, ingestEventId, update);
   }
 
   private unwrapError(error: unknown): Error {
-    if (error instanceof UsersHydrationError && error.original instanceof Error) {
+    if (error instanceof UsersByIdsIngestError && error.original instanceof Error) {
       return error.original;
     }
     if (error instanceof Error) return error;
@@ -287,7 +287,7 @@ export class UsersHydrationService {
   }
 }
 
-export class PostsHydrationService {
+export class PostsByIdsIngestService {
   private readonly db: Db;
   private readonly logger: Logger;
   private readonly client: TwitterApiClient;
@@ -311,16 +311,16 @@ export class PostsHydrationService {
     this.httpSnapshotMaxBytes = resolveHttpBodyMaxBytes(params.httpSnapshotMaxBytes);
   }
 
-  async hydratePostsByIds(params: {
+  async ingestPostsByIds(params: {
     postIds: Iterable<PostId>;
     force?: boolean;
-  }): Promise<PostsHydrationResult> {
+  }): Promise<PostsByIdsIngestResult> {
     const requestedIds = normalizePostIds(params.postIds);
     if (requestedIds.length === 0) {
       return {
         ingestEventId: null,
         requestedPostIds: [],
-        hydratedPostIds: [],
+        ingestedPostIds: [],
         skippedPostIds: [],
         authorUserIds: [],
       };
@@ -335,15 +335,15 @@ export class PostsHydrationService {
       return {
         ingestEventId: null,
         requestedPostIds: requestedIds,
-        hydratedPostIds: [],
+        ingestedPostIds: [],
         skippedPostIds: requestedIds,
         authorUserIds: [],
       };
     }
 
-    const run = await createPostsByIdsHydrationRun(this.db);
+    const run = await createPostsByIdsIngestRun(this.db);
     const ingestEventId = run.id;
-    await addPostsByIdsHydrationRunRequestedPosts(this.db, ingestEventId, missingIds);
+    await addPostsByIdsIngestRunRequestedPosts(this.db, ingestEventId, missingIds);
 
     this.logger.info(
       {
@@ -352,15 +352,15 @@ export class PostsHydrationService {
         run_id: ingestEventId.toString(),
         requestedPostIds: missingIds.map((id) => id.toString()),
       },
-      "Starting posts-by-ids hydration",
+      "Starting posts-by-ids ingest",
     );
 
     try {
       const result = await this.fetchPostsByIds(missingIds);
       const missing = missingIds.filter((id) => !result.postsById.has(id));
       if (missing.length > 0) {
-        throw new PostsHydrationError(
-          `Hydration response missing ${missing.length} post id(s): ${missing
+        throw new PostsByIdsIngestError(
+          `Posts-by-ids ingest response missing ${missing.length} post id(s): ${missing
             .map((id) => id.toString())
             .join(", ")}`,
           { status: "missing-posts" },
@@ -423,7 +423,7 @@ export class PostsHydrationService {
         if (usersMetaById.size > 0) {
           await upsertUsersMeta(trx, Array.from(usersMetaById.values()));
         }
-        await updatePostsByIdsHydrationRun(trx, ingestEventId, {
+        await updatePostsByIdsIngestRun(trx, ingestEventId, {
           status: "success",
           completedAt: now,
           lastApiStatus: "200",
@@ -436,15 +436,15 @@ export class PostsHydrationService {
           ingestKind: POSTS_BY_IDS_INGEST_KIND,
           ingestEventId: ingestEventId.toString(),
           run_id: ingestEventId.toString(),
-          hydratedPostIds: missingIds.map((id) => id.toString()),
+          ingestedPostIds: missingIds.map((id) => id.toString()),
         },
-        "Completed posts-by-ids hydration",
+        "Completed posts-by-ids ingest",
       );
 
       return {
         ingestEventId,
         requestedPostIds: requestedIds,
-        hydratedPostIds: missingIds,
+        ingestedPostIds: missingIds,
         skippedPostIds: requestedIds.filter((id) => !missingIds.includes(id)),
         authorUserIds: Array.from(usersMetaById.keys()).sort(compareBigInt),
       };
@@ -469,14 +469,14 @@ export class PostsHydrationService {
         }
       } catch (error) {
         if (error instanceof TwitterApiRateLimitError) {
-          throw new PostsHydrationRateLimitError(error.message, {
+          throw new PostsByIdsIngestRateLimitError(error.message, {
             retryAfterSeconds: error.retryAfterSeconds,
             original: error,
           });
         }
         if (error instanceof TwitterApiError) {
           const status = error.status !== undefined ? String(error.status) : "posts-by-ids";
-          throw new PostsHydrationError(error.message, { status, original: error });
+          throw new PostsByIdsIngestError(error.message, { status, original: error });
         }
         throw error;
       }
@@ -486,7 +486,7 @@ export class PostsHydrationService {
   }
 
   private async recordFailure(ingestEventId: IngestEventId, error: unknown): Promise<void> {
-    const status = error instanceof PostsHydrationError ? error.status : "exception";
+    const status = error instanceof PostsByIdsIngestError ? error.status : "exception";
     const message = error instanceof Error ? error.message : String(error);
     const completionTime = new Date();
     const last = sanitizeHttpExchange(this.client.lastExchange(), this.httpSnapshotMaxBytes);
@@ -503,11 +503,11 @@ export class PostsHydrationService {
       update.lastHttpResponse = last.response ?? null;
     }
 
-    await updatePostsByIdsHydrationRun(this.db, ingestEventId, update);
+    await updatePostsByIdsIngestRun(this.db, ingestEventId, update);
   }
 
   private unwrapError(error: unknown): Error {
-    if (error instanceof PostsHydrationError && error.original instanceof Error) {
+    if (error instanceof PostsByIdsIngestError && error.original instanceof Error) {
       return error.original;
     }
     if (error instanceof Error) return error;

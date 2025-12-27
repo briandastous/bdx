@@ -14,7 +14,7 @@ import {
 import { IngestEventId, PostId, UserId } from "@bdx/ids";
 import { createLogger } from "@bdx/observability";
 import { TwitterApiClient } from "@bdx/twitterapi-io";
-import { PostsHydrationService, UsersHydrationService } from "./hydration.js";
+import { PostsByIdsIngestService, UsersByIdsIngestService } from "./hydration.js";
 
 async function createIngestEvent(db: Db, ingestKind: IngestKind): Promise<IngestEventId> {
   const row = await db
@@ -79,10 +79,10 @@ async function seedUser(db: Db, userId: UserId): Promise<void> {
 }
 
 async function resetDb(db: Db): Promise<void> {
-  await db.deleteFrom("posts_by_ids_hydration_run_requested_posts").execute();
-  await db.deleteFrom("posts_by_ids_hydration_runs").execute();
-  await db.deleteFrom("users_by_ids_hydration_run_requested_users").execute();
-  await db.deleteFrom("users_by_ids_hydration_runs").execute();
+  await db.deleteFrom("posts_by_ids_ingest_run_requested_posts").execute();
+  await db.deleteFrom("posts_by_ids_ingest_runs").execute();
+  await db.deleteFrom("users_by_ids_ingest_run_requested_users").execute();
+  await db.deleteFrom("users_by_ids_ingest_runs").execute();
   await db.deleteFrom("posts_meta").execute();
   await db.deleteFrom("posts").execute();
   await db.deleteFrom("users_meta").execute();
@@ -91,7 +91,7 @@ async function resetDb(db: Db): Promise<void> {
   await db.deleteFrom("ingest_events").execute();
 }
 
-describe("hydration services", () => {
+describe("by-ids ingest services", () => {
   let container: StartedPostgreSqlContainer;
   let db: Db;
 
@@ -114,8 +114,8 @@ describe("hydration services", () => {
     await container.stop();
   });
 
-  describe("UsersHydrationService", () => {
-    it("skips hydration when all users already exist", async () => {
+  describe("UsersByIdsIngestService", () => {
+    it("skips ingest when all users already exist", async () => {
       const userId = UserId(1n);
       await seedUser(db, userId);
 
@@ -128,19 +128,19 @@ describe("hydration services", () => {
           throw new Error("Unexpected upstream call");
         },
       });
-      const service = new UsersHydrationService({ db, logger, client, batchSize: 100 });
+      const service = new UsersByIdsIngestService({ db, logger, client, batchSize: 100 });
 
       const beforeEvents = await db.selectFrom("ingest_events").select(["id"]).execute();
-      const result = await service.hydrateUsersByIds({ userIds: [userId] });
+      const result = await service.ingestUsersByIds({ userIds: [userId] });
       const afterEvents = await db.selectFrom("ingest_events").select(["id"]).execute();
 
       expect(result.ingestEventId).toBeNull();
-      expect(result.hydratedUserIds).toHaveLength(0);
+      expect(result.ingestedUserIds).toHaveLength(0);
       expect(result.skippedUserIds).toEqual([userId]);
       expect(afterEvents).toHaveLength(beforeEvents.length);
 
       const runs = await db
-        .selectFrom("users_by_ids_hydration_runs")
+        .selectFrom("users_by_ids_ingest_runs")
         .select(["ingest_event_id"])
         .execute();
       expect(runs).toHaveLength(0);
@@ -172,8 +172,8 @@ describe("hydration services", () => {
         },
       });
 
-      const service = new UsersHydrationService({ db, logger, client, batchSize: 1 });
-      await service.hydrateUsersByIds({ userIds });
+      const service = new UsersByIdsIngestService({ db, logger, client, batchSize: 1 });
+      await service.ingestUsersByIds({ userIds });
 
       expect(calls).toEqual(["1", "2"]);
 
@@ -194,17 +194,17 @@ describe("hydration services", () => {
             }),
           ),
       });
-      const service = new UsersHydrationService({ db, logger, client, batchSize: 100 });
+      const service = new UsersByIdsIngestService({ db, logger, client, batchSize: 100 });
 
       await expect(
-        service.hydrateUsersByIds({ userIds: [UserId(1n), UserId(2n)] }),
+        service.ingestUsersByIds({ userIds: [UserId(1n), UserId(2n)] }),
       ).rejects.toThrow();
 
       const users = await db.selectFrom("users").select(["id"]).execute();
       expect(users).toHaveLength(0);
 
       const run = await db
-        .selectFrom("users_by_ids_hydration_runs")
+        .selectFrom("users_by_ids_ingest_runs")
         .select(["status", "last_http_response"])
         .executeTakeFirstOrThrow();
       expect(run.status).toBe("error");
@@ -220,12 +220,12 @@ describe("hydration services", () => {
         fetch: () =>
           Promise.resolve(new Response(JSON.stringify({ error: "boom" }), { status: 500 })),
       });
-      const service = new UsersHydrationService({ db, logger, client, batchSize: 100 });
+      const service = new UsersByIdsIngestService({ db, logger, client, batchSize: 100 });
 
-      await expect(service.hydrateUsersByIds({ userIds: [UserId(1n)] })).rejects.toThrow();
+      await expect(service.ingestUsersByIds({ userIds: [UserId(1n)] })).rejects.toThrow();
 
       const run = await db
-        .selectFrom("users_by_ids_hydration_runs")
+        .selectFrom("users_by_ids_ingest_runs")
         .select(["status", "last_api_status", "last_http_response"])
         .executeTakeFirstOrThrow();
       expect(run.status).toBe("error");
@@ -234,8 +234,8 @@ describe("hydration services", () => {
     });
   });
 
-  describe("PostsHydrationService", () => {
-    it("skips hydration when all posts already exist", async () => {
+  describe("PostsByIdsIngestService", () => {
+    it("skips ingest when all posts already exist", async () => {
       const authorId = UserId(99n);
       const postId = PostId(123n);
       await seedUser(db, authorId);
@@ -258,19 +258,19 @@ describe("hydration services", () => {
           throw new Error("Unexpected upstream call");
         },
       });
-      const service = new PostsHydrationService({ db, logger, client, batchSize: 100 });
+      const service = new PostsByIdsIngestService({ db, logger, client, batchSize: 100 });
 
       const beforeEvents = await db.selectFrom("ingest_events").select(["id"]).execute();
-      const result = await service.hydratePostsByIds({ postIds: [postId] });
+      const result = await service.ingestPostsByIds({ postIds: [postId] });
       const afterEvents = await db.selectFrom("ingest_events").select(["id"]).execute();
 
       expect(result.ingestEventId).toBeNull();
-      expect(result.hydratedPostIds).toHaveLength(0);
+      expect(result.ingestedPostIds).toHaveLength(0);
       expect(result.skippedPostIds).toEqual([postId]);
       expect(afterEvents).toHaveLength(beforeEvents.length);
 
       const runs = await db
-        .selectFrom("posts_by_ids_hydration_runs")
+        .selectFrom("posts_by_ids_ingest_runs")
         .select(["ingest_event_id"])
         .execute();
       expect(runs).toHaveLength(0);
@@ -308,9 +308,9 @@ describe("hydration services", () => {
           return Promise.resolve(new Response(JSON.stringify({ tweets: posts }), { status: 200 }));
         },
       });
-      const service = new PostsHydrationService({ db, logger, client, batchSize: 1 });
+      const service = new PostsByIdsIngestService({ db, logger, client, batchSize: 1 });
 
-      await service.hydratePostsByIds({ postIds: [PostId(1n), PostId(2n)] });
+      await service.ingestPostsByIds({ postIds: [PostId(1n), PostId(2n)] });
 
       expect(calls).toEqual(["1", "2"]);
 
@@ -341,17 +341,17 @@ describe("hydration services", () => {
             ),
           ),
       });
-      const service = new PostsHydrationService({ db, logger, client, batchSize: 100 });
+      const service = new PostsByIdsIngestService({ db, logger, client, batchSize: 100 });
 
       await expect(
-        service.hydratePostsByIds({ postIds: [PostId(1n), PostId(2n)] }),
+        service.ingestPostsByIds({ postIds: [PostId(1n), PostId(2n)] }),
       ).rejects.toThrow();
 
       const posts = await db.selectFrom("posts").select(["id"]).execute();
       expect(posts).toHaveLength(0);
 
       const run = await db
-        .selectFrom("posts_by_ids_hydration_runs")
+        .selectFrom("posts_by_ids_ingest_runs")
         .select(["status", "last_http_response"])
         .executeTakeFirstOrThrow();
       expect(run.status).toBe("error");
@@ -367,12 +367,12 @@ describe("hydration services", () => {
         fetch: () =>
           Promise.resolve(new Response(JSON.stringify({ error: "boom" }), { status: 500 })),
       });
-      const service = new PostsHydrationService({ db, logger, client, batchSize: 100 });
+      const service = new PostsByIdsIngestService({ db, logger, client, batchSize: 100 });
 
-      await expect(service.hydratePostsByIds({ postIds: [PostId(1n)] })).rejects.toThrow();
+      await expect(service.ingestPostsByIds({ postIds: [PostId(1n)] })).rejects.toThrow();
 
       const run = await db
-        .selectFrom("posts_by_ids_hydration_runs")
+        .selectFrom("posts_by_ids_ingest_runs")
         .select(["status", "last_api_status", "last_http_response"])
         .executeTakeFirstOrThrow();
       expect(run.status).toBe("error");

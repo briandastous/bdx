@@ -2,7 +2,7 @@ import { Command, Flags } from "@oclif/core";
 import { loadBaseEnv, loadWorkerEnv } from "@bdx/config";
 import { enableAssetInstanceRoot, replaceSpecifiedUsersInputs } from "@bdx/db";
 import type { AssetInstanceId } from "@bdx/ids";
-import { UsersHydrationService } from "@bdx/ingest";
+import { UsersByIdsIngestService } from "@bdx/ingest";
 import {
   createDbFromEnv,
   createLoggerFromEnv,
@@ -64,13 +64,13 @@ export default class AssetsRootsEnable extends Command {
           const ids = parseUserIdCsv(flags["specified-user-ids"], "specified-user-ids");
           const workerEnv = loadWorkerEnv();
           const twitterClient = createTwitterClient(workerEnv);
-          const hydration = new UsersHydrationService({
+          const usersByIdsIngest = new UsersByIdsIngestService({
             db,
             logger,
             client: twitterClient,
             batchSize: workerEnv.twitterapiIo.batchUsersByIdsMax,
           });
-          await hydration.hydrateUsersByIds({ userIds: ids });
+          await usersByIdsIngest.ingestUsersByIds({ userIds: ids });
           await replaceSpecifiedUsersInputs(db, { instanceId, userIds: ids });
         }
       }

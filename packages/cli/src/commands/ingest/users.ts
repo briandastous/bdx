@@ -1,6 +1,6 @@
 import { Command, Flags } from "@oclif/core";
 import { loadWorkerEnv } from "@bdx/config";
-import { UsersHydrationService } from "@bdx/ingest";
+import { UsersByIdsIngestService } from "@bdx/ingest";
 import {
   createDbFromEnv,
   createLoggerFromEnv,
@@ -10,15 +10,15 @@ import {
 import { parseUserIdCsv } from "../../lib/parsers.js";
 
 export default class IngestUsers extends Command {
-  static override description = "Hydrate one or more X users by id.";
+  static override description = "Ingest one or more X users by id.";
 
   static override flags = {
     "user-ids": Flags.string({
-      description: "Comma-separated X user ids to hydrate.",
+      description: "Comma-separated X user ids to ingest.",
       required: true,
     }),
     force: Flags.boolean({
-      description: "Force hydration for existing users.",
+      description: "Force ingest for existing users.",
       default: false,
     }),
   };
@@ -33,7 +33,7 @@ export default class IngestUsers extends Command {
     const client = createTwitterClient(env);
 
     try {
-      const service = new UsersHydrationService({
+      const service = new UsersByIdsIngestService({
         db,
         logger,
         client,
@@ -41,13 +41,13 @@ export default class IngestUsers extends Command {
         httpSnapshotMaxBytes: env.retention.httpBodyMaxBytes,
       });
 
-      const result = await service.hydrateUsersByIds({ userIds, force: flags.force });
+      const result = await service.ingestUsersByIds({ userIds, force: flags.force });
 
       this.log(
         [
           `ingest_event_id=${result.ingestEventId?.toString() ?? "null"}`,
           `requested=${result.requestedUserIds.length}`,
-          `hydrated=${result.hydratedUserIds.length}`,
+          `ingested=${result.ingestedUserIds.length}`,
           `skipped=${result.skippedUserIds.length}`,
         ].join(" "),
       );

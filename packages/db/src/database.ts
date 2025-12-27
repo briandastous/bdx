@@ -324,12 +324,12 @@ export interface SegmentUnreciprocatedFollowedParams {
   subject_external_id: bigint;
 }
 
-export interface PostsByIdsHydrationRunRequestedPosts {
+export interface PostsByIdsIngestRunRequestedPosts {
   post_id: bigint;
-  posts_by_ids_hydration_run_id: bigint;
+  posts_by_ids_ingest_run_id: bigint;
 }
 
-export interface PostsByIdsHydrationRuns {
+export interface PostsByIdsIngestRuns {
   completed_at: Timestamp | null;
   ingest_event_id: bigint;
   last_api_error: string | null;
@@ -383,12 +383,12 @@ export interface Users {
   withheld_countries: string[] | null;
 }
 
-export interface UsersByIdsHydrationRunRequestedUsers {
+export interface UsersByIdsIngestRunRequestedUsers {
   user_id: bigint;
-  users_by_ids_hydration_run_id: bigint;
+  users_by_ids_ingest_run_id: bigint;
 }
 
-export interface UsersByIdsHydrationRuns {
+export interface UsersByIdsIngestRuns {
   completed_at: Timestamp | null;
   ingest_event_id: bigint;
   last_api_error: string | null;
@@ -456,12 +456,12 @@ export interface DB {
   segment_specified_users_inputs: SegmentSpecifiedUsersInputs;
   segment_specified_users_params: SegmentSpecifiedUsersParams;
   segment_unreciprocated_followed_params: SegmentUnreciprocatedFollowedParams;
-  posts_by_ids_hydration_run_requested_posts: PostsByIdsHydrationRunRequestedPosts;
-  posts_by_ids_hydration_runs: PostsByIdsHydrationRuns;
+  posts_by_ids_ingest_run_requested_posts: PostsByIdsIngestRunRequestedPosts;
+  posts_by_ids_ingest_runs: PostsByIdsIngestRuns;
   user_handle_history: UserHandleHistory;
   users: Users;
-  users_by_ids_hydration_run_requested_users: UsersByIdsHydrationRunRequestedUsers;
-  users_by_ids_hydration_runs: UsersByIdsHydrationRuns;
+  users_by_ids_ingest_run_requested_users: UsersByIdsIngestRunRequestedUsers;
+  users_by_ids_ingest_runs: UsersByIdsIngestRuns;
   users_meta: UsersMeta;
   webhook_follow_events: WebhookFollowEvents;
   worker_heartbeats: WorkerHeartbeats;
